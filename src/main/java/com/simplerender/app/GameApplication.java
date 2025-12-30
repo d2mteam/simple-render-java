@@ -15,8 +15,8 @@ public final class GameApplication {
 
     public GameApplication(EngineConfig config) {
         this.config = config;
-        this.scene = Scene.bootstrap(config);
         this.renderer = new OpenGLRenderer(config.chunkCount());
+        this.scene = Scene.bootstrap(config, renderer);
         this.gameLoop = new GameLoop(config, new Time(), scene, renderer);
     }
 

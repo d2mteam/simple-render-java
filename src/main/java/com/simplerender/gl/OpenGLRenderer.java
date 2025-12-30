@@ -1,10 +1,14 @@
 package com.simplerender.gl;
 
+import com.simplerender.asset.MaterialData;
+import com.simplerender.asset.MeshData;
+import com.simplerender.render.MaterialHandle;
+import com.simplerender.render.MeshHandle;
+import com.simplerender.render.MeshUploader;
+import com.simplerender.render.RenderItem;
 import com.simplerender.render.culling.FrustumCuller;
-import com.simplerender.render.mesh.MeshCache;
 import com.simplerender.render.pipeline.RenderPipeline;
 import com.simplerender.scene.SceneSnapshot;
-import com.simplerender.world.ChunkMeshData;
 import org.lwjgl.glfw.GLFW;
 import org.lwjgl.opengl.GL;
 import org.lwjgl.opengl.GL11;
@@ -12,12 +16,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import com.simplerender.app.InputState;
 
-public final class OpenGLRenderer {
+public final class OpenGLRenderer implements MeshUploader {
     private static final Logger logger = LoggerFactory.getLogger(OpenGLRenderer.class);
 
-    private final RenderPipeline[] pipelines;
-    private final GPUMesh[] gpuMeshes;
+    private final RenderPipeline pipeline;
     private final ShaderProgram shaderProgram;
+    private final GpuResourceManager resourceManager;
     private RenderUniforms uniforms;
     private boolean initialized;
     private long window;
@@ -28,13 +32,9 @@ public final class OpenGLRenderer {
     private final double[] cursorPosY = new double[1];
 
     public OpenGLRenderer(int chunkCount) {
-        this.pipelines = new RenderPipeline[chunkCount];
-        this.gpuMeshes = new GPUMesh[chunkCount];
+        this.pipeline = new RenderPipeline(new FrustumCuller());
         this.shaderProgram = new ShaderProgram();
-        for (int i = 0; i < chunkCount; i++) {
-            pipelines[i] = new RenderPipeline(new MeshCache(), new FrustumCuller());
-            gpuMeshes[i] = new GPUMesh();
-        }
+        this.resourceManager = new GpuResourceManager();
         logger.info("Renderer initialized with {} GPU mesh slots", chunkCount);
     }
 
@@ -42,8 +42,7 @@ public final class OpenGLRenderer {
         if (!initialized) {
             initWindow();
         }
-        if (pipelines.length == 0) {
-            logger.error("Renderer has no GPU mesh slots configured");
+        if (!pipeline.shouldRender(snapshot.camera())) {
             return;
         }
         GL11.glClear(GL11.GL_COLOR_BUFFER_BIT | GL11.GL_DEPTH_BUFFER_BIT);
@@ -52,24 +51,20 @@ public final class OpenGLRenderer {
         shaderProgram.setUniformMat4("uProjection", uniforms.projectionMatrix());
         shaderProgram.setUniformMat4("uView", uniforms.viewMatrix());
         shaderProgram.setUniformVec3("uLightDir", uniforms.lightDirection());
-        ChunkMeshData[] chunks = snapshot.chunkMeshData();
-        int count = Math.min(chunks.length, gpuMeshes.length);
-        for (int i = 0; i < count; i++) {
-            ChunkMeshData chunk = chunks[i];
-            RenderPipeline pipeline = pipelines[i];
-            GPUMesh gpuMesh = gpuMeshes[i];
-            if (!pipeline.shouldRender(snapshot.camera(), chunk)) {
+        RenderItem[] renderItems = snapshot.renderItems();
+        for (int i = 0; i < renderItems.length; i++) {
+            RenderItem item = renderItems[i];
+            GPUMesh mesh = resourceManager.mesh(item.meshHandle());
+            GpuResourceManager.GpuMaterial material = resourceManager.material(item.materialHandle());
+            if (mesh == null || material == null) {
+                logger.error("Missing GPU resources for render item {}", i);
                 continue;
             }
-            if (gpuMesh.needsUpload(chunk)) {
-                gpuMesh.upload(chunk);
-                pipeline.markUploaded(chunk);
-                logger.debug("Uploaded chunk {} with {} vertices", i, chunk.vertexCount());
-            }
-            gpuMesh.draw();
+            shaderProgram.setUniformVec3("uBaseColor", material.baseColor());
+            mesh.draw();
         }
         GLFW.glfwSwapBuffers(window);
-        logger.info("Rendered {} chunks", count);
+        logger.info("Rendered {} items", renderItems.length);
     }
 
     public void pollEvents() {
@@ -106,6 +101,22 @@ public final class OpenGLRenderer {
 
     public boolean shouldClose() {
         return initialized && GLFW.glfwWindowShouldClose(window);
+    }
+
+    @Override
+    public MeshHandle uploadMesh(MeshData meshData) {
+        if (!initialized) {
+            initWindow();
+        }
+        return resourceManager.uploadMesh(meshData);
+    }
+
+    @Override
+    public MaterialHandle uploadMaterial(MaterialData materialData) {
+        if (!initialized) {
+            initWindow();
+        }
+        return resourceManager.uploadMaterial(materialData);
     }
 
     private void initWindow() {
@@ -152,11 +163,11 @@ public final class OpenGLRenderer {
         return "#version 330 core\n"
             + "in vec3 vNormal;\n"
             + "uniform vec3 uLightDir;\n"
+            + "uniform vec3 uBaseColor;\n"
             + "out vec4 FragColor;\n"
             + "void main() {\n"
             + "    float diff = max(dot(normalize(vNormal), normalize(-uLightDir)), 0.0);\n"
-            + "    vec3 base = vec3(0.2, 0.8, 0.4);\n"
-            + "    vec3 color = base * (0.2 + diff * 0.8);\n"
+            + "    vec3 color = uBaseColor * (0.2 + diff * 0.8);\n"
             + "    FragColor = vec4(color, 1.0);\n"
             + "}\n";
     }

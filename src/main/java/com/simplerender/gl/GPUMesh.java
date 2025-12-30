@@ -1,6 +1,6 @@
 package com.simplerender.gl;
 
-import com.simplerender.world.ChunkMeshData;
+import com.simplerender.asset.MeshData;
 import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL20;
 import org.slf4j.Logger;
@@ -9,7 +9,7 @@ import org.slf4j.LoggerFactory;
 final class GPUMesh {
     private static final Logger logger = LoggerFactory.getLogger(GPUMesh.class);
 
-    private ChunkMeshData lastUpload;
+    private MeshData lastUpload;
     private final VertexArray vertexArray;
     private final VertexBuffer vertexBuffer;
     private final IndexBuffer indexBuffer;
@@ -24,11 +24,11 @@ final class GPUMesh {
         this.indexCount = 0;
     }
 
-    public boolean needsUpload(ChunkMeshData snapshot) {
+    public boolean needsUpload(MeshData snapshot) {
         return snapshot != lastUpload;
     }
 
-    public void upload(ChunkMeshData snapshot) {
+    public void upload(MeshData snapshot) {
         lastUpload = snapshot;
         int vertexCount = snapshot.vertexCount();
         if (vertexCount == 0) {
@@ -45,16 +45,19 @@ final class GPUMesh {
         vertexArray.bind();
         vertexBuffer.bind();
         indexBuffer.bind();
-        int required = snapshot.positions().length / 3 * 6;
+        float[] positions = snapshot.positions();
+        float[] normals = snapshot.normals();
+        int required = positions.length / 3 * 6;
         ensureInterleavedCapacity(required);
-        interleave(snapshot.positions(), snapshot.normals(), interleaved);
+        interleave(positions, normals, interleaved);
         vertexBuffer.upload(interleaved, required);
-        indexBuffer.upload(snapshot.indices(), snapshot.indices().length);
+        int[] indexData = snapshot.indices();
+        indexBuffer.upload(indexData, indexData.length);
         GL20.glEnableVertexAttribArray(0);
         GL20.glVertexAttribPointer(0, 3, GL11.GL_FLOAT, false, 6 * Float.BYTES, 0);
         GL20.glEnableVertexAttribArray(1);
         GL20.glVertexAttribPointer(1, 3, GL11.GL_FLOAT, false, 6 * Float.BYTES, 3L * Float.BYTES);
-        indexCount = snapshot.indices().length;
+        indexCount = indexData.length;
         logger.debug("Uploaded mesh with {} vertices and {} indices", vertexCount, indexCount);
     }
 
