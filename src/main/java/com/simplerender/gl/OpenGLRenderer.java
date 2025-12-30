@@ -87,11 +87,8 @@ public final class OpenGLRenderer implements MeshUploader {
             }
             shaderProgram.setUniformMat4("uModel", item.transform().matrix());
             shaderProgram.setUniformVec3("uBaseColor", material.baseColor());
-            bindTextureUnit(GL13.GL_TEXTURE0, material.baseColorTexture());
-            bindTextureUnit(GL13.GL_TEXTURE1, material.normalTexture());
-            bindTextureUnit(GL13.GL_TEXTURE2, material.metallicRoughnessTexture());
-            bindTextureUnit(GL13.GL_TEXTURE3, material.aoTexture());
-            bindTextureUnit(GL13.GL_TEXTURE4, material.emissiveTexture());
+            GpuTexture texture = resourceManager.texture(material.textureHandle());
+            bindTextureUnit(GL13.GL_TEXTURE0, texture);
             mesh.draw();
         }
         GLFW.glfwSwapBuffers(window);
@@ -210,5 +207,13 @@ public final class OpenGLRenderer implements MeshUploader {
         shaderProgram.setUniformMat4("uProjection", uniforms.projectionMatrix());
         shaderProgram.setUniformInt("uTexture", 0);
         activeShaderName = pendingShaderName;
+    }
+
+    private void bindTextureUnit(int textureUnit, GpuTexture texture) {
+        if (texture == null) {
+            return;
+        }
+        GL13.glActiveTexture(textureUnit);
+        GL11.glBindTexture(GL11.GL_TEXTURE_2D, texture.id());
     }
 }
