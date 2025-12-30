@@ -36,7 +36,7 @@ final class GpuResourceManager {
     public MaterialHandle uploadMaterial(MaterialData materialData) {
         TextureHandle textureHandle = materialData.textureData()
             .map(this::uploadTexture)
-            .orElseGet(this::defaultTexture);
+            .orElseGet(() -> defaultTexture);
         MaterialHandle handle = new MaterialHandle(materialId.incrementAndGet());
         materials.put(handle, new GpuMaterial(materialData.baseColor(), textureHandle));
         logger.info("Uploaded material handle {}", handle.hashCode());
