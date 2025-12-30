@@ -1,7 +1,7 @@
 package com.simplerender.scene;
 
 import com.simplerender.app.EngineConfig;
-import com.simplerender.app.InputState;
+import com.simplerender.app.ModelImportService;
 import com.simplerender.app.Time;
 import com.simplerender.asset.MaterialData;
 import com.simplerender.asset.MeshData;
@@ -17,7 +17,7 @@ import com.simplerender.render.MeshUploader;
 import com.simplerender.render.RenderItem;
 import com.simplerender.world.ChunkMeshData;
 import com.simplerender.world.ChunkMeshDataFactory;
-import java.util.Optional;
+import java.nio.file.Path;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -37,15 +37,31 @@ public final class Scene {
     public static Scene bootstrap(EngineConfig config, MeshUploader meshUploader, Optional<ModelImporter.ImportedModel> importedModel) {
         Camera camera = new Camera();
         CameraController cameraController = new CameraController();
-        RenderableChunk[] chunks = importedModel
-            .map(model -> new RenderableChunk[] {createFromImported(meshUploader, model)})
-            .orElseGet(() -> createRandomChunks(config, meshUploader));
+        ChunkMeshData[] meshData = loadMeshData(config);
+        RenderableChunk[] chunks = new RenderableChunk[meshData.length];
+        for (int i = 0; i < meshData.length; i++) {
+            chunks[i] = new RenderableChunk(meshData[i]);
+        }
         logger.info("Scene bootstrapped with {} chunks", chunks.length);
         return new Scene(camera, cameraController, chunks);
     }
 
-    public void update(Time time, InputState inputState) {
-        cameraController.update(camera, time, inputState);
+    private static ChunkMeshData[] loadMeshData(EngineConfig config) {
+        String modelPath = config.modelPath();
+        if (modelPath == null || modelPath.isBlank()) {
+            return ChunkMeshDataFactory.randomChunks(config.chunkCount(), config.randomSeed());
+        }
+        ModelImportService importService = new ModelImportService();
+        ChunkMeshData imported = importService.importModel(Path.of(modelPath.trim()));
+        if (imported == null) {
+            logger.warn("Falling back to random chunks because model import failed");
+            return ChunkMeshDataFactory.randomChunks(config.chunkCount(), config.randomSeed());
+        }
+        return new ChunkMeshData[] {imported};
+    }
+
+    public void update(Time time) {
+        cameraController.update(camera, time);
     }
 
     public SceneSnapshot snapshot() {
