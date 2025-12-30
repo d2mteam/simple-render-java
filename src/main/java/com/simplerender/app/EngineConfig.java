@@ -40,6 +40,6 @@ public final class EngineConfig {
     }
 
     public static EngineConfig defaultConfig() {
-        return new EngineConfig(60, 3, 3, 1337L, null);
+        return new EngineConfig(60, 0, 3, 1337L, null);
     }
 }
