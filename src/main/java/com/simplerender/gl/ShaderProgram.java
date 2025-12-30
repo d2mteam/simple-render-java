@@ -71,6 +71,16 @@ final class ShaderProgram {
         return initialized;
     }
 
+    public void dispose() {
+        if (!initialized) {
+            return;
+        }
+        GL20.glDeleteProgram(programId);
+        programId = 0;
+        initialized = false;
+        logger.info("Shader program disposed");
+    }
+
     private int compileShader(int type, String source) {
         int shader = GL20.glCreateShader(type);
         GL20.glShaderSource(shader, source);

@@ -2,6 +2,8 @@ package com.simplerender.gl;
 
 import com.simplerender.asset.MaterialData;
 import com.simplerender.asset.MeshData;
+import com.simplerender.asset.ShaderSource;
+import com.simplerender.asset.ShaderSourceLoader;
 import com.simplerender.asset.TextureData;
 import com.simplerender.asset.TextureDataFactory;
 import com.simplerender.render.MaterialHandle;
@@ -18,7 +20,6 @@ import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL13;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import com.simplerender.app.InputState;
 
 public final class OpenGLRenderer implements MeshUploader {
     private static final Logger logger = LoggerFactory.getLogger(OpenGLRenderer.class);
@@ -28,24 +29,27 @@ public final class OpenGLRenderer implements MeshUploader {
     private final GpuResourceManager resourceManager;
     private RenderUniforms uniforms;
     private boolean initialized;
+    private String pendingShaderName;
+    private String activeShaderName;
     private long window;
-    private double lastMouseX;
-    private double lastMouseY;
-    private boolean firstMouse = true;
-    private final double[] cursorPosX = new double[1];
-    private final double[] cursorPosY = new double[1];
 
     public OpenGLRenderer(int chunkCount) {
+        this(chunkCount, "default");
+    }
+
+    public OpenGLRenderer(int chunkCount, String shaderName) {
         this.pipeline = new RenderPipeline(new FrustumCuller());
         this.shaderProgram = new ShaderProgram();
         this.resourceManager = new GpuResourceManager();
+        String resolved = shaderName != null && !shaderName.isBlank() ? shaderName : "default";
+        this.pendingShaderName = resolved;
+        this.activeShaderName = resolved;
         logger.info("Renderer initialized with {} GPU mesh slots", chunkCount);
     }
 
     public void render(SceneSnapshot snapshot) {
-        if (!initialized) {
-            initWindow();
-        }
+        ensureInitialized();
+        applyPendingShader();
         if (!pipeline.shouldRender(snapshot.camera())) {
             return;
         }
@@ -64,16 +68,16 @@ public final class OpenGLRenderer implements MeshUploader {
                 logger.error("Missing GPU resources for render item {}", i);
                 continue;
             }
+            shaderProgram.setUniformMat4("uModel", item.transform().matrix());
             shaderProgram.setUniformVec3("uBaseColor", material.baseColor());
-            GpuTexture texture = resourceManager.texture(material.textureHandle());
-            if (texture != null) {
-                GL13.glActiveTexture(GL13.GL_TEXTURE0);
-                GL11.glBindTexture(GL11.GL_TEXTURE_2D, texture.id());
-            }
+            bindTextureUnit(GL13.GL_TEXTURE0, resourceManager.texture(material.baseColorTexture()));
+            bindTextureUnit(GL13.GL_TEXTURE1, resourceManager.texture(material.normalTexture()));
+            bindTextureUnit(GL13.GL_TEXTURE2, resourceManager.texture(material.metallicRoughnessTexture()));
+            bindTextureUnit(GL13.GL_TEXTURE3, resourceManager.texture(material.aoTexture()));
+            bindTextureUnit(GL13.GL_TEXTURE4, resourceManager.texture(material.emissiveTexture()));
             mesh.draw();
         }
         GLFW.glfwSwapBuffers(window);
-        logger.info("Rendered {} items", renderItems.length);
     }
 
     public void pollEvents() {
@@ -83,60 +87,39 @@ public final class OpenGLRenderer implements MeshUploader {
         GLFW.glfwPollEvents();
     }
 
-    public InputState readInput() {
-        if (!initialized) {
-            return new InputState(false, false, false, false, false, false, 0.0, 0.0);
-        }
-        boolean forward = GLFW.glfwGetKey(window, GLFW.GLFW_KEY_W) == GLFW.GLFW_PRESS;
-        boolean backward = GLFW.glfwGetKey(window, GLFW.GLFW_KEY_S) == GLFW.GLFW_PRESS;
-        boolean left = GLFW.glfwGetKey(window, GLFW.GLFW_KEY_A) == GLFW.GLFW_PRESS;
-        boolean right = GLFW.glfwGetKey(window, GLFW.GLFW_KEY_D) == GLFW.GLFW_PRESS;
-        boolean up = GLFW.glfwGetKey(window, GLFW.GLFW_KEY_SPACE) == GLFW.GLFW_PRESS;
-        boolean down = GLFW.glfwGetKey(window, GLFW.GLFW_KEY_LEFT_SHIFT) == GLFW.GLFW_PRESS;
-
-        GLFW.glfwGetCursorPos(window, cursorPosX, cursorPosY);
-        if (firstMouse) {
-            lastMouseX = cursorPosX[0];
-            lastMouseY = cursorPosY[0];
-            firstMouse = false;
-        }
-        double deltaX = cursorPosX[0] - lastMouseX;
-        double deltaY = cursorPosY[0] - lastMouseY;
-        lastMouseX = cursorPosX[0];
-        lastMouseY = cursorPosY[0];
-
-        return new InputState(forward, backward, left, right, up, down, deltaX, deltaY);
-    }
-
     public boolean shouldClose() {
         return initialized && GLFW.glfwWindowShouldClose(window);
     }
 
+    public void requestShader(String shaderName) {
+        if (shaderName == null || shaderName.isBlank()) {
+            return;
+        }
+        pendingShaderName = shaderName;
+    }
+
     @Override
     public MeshHandle uploadMesh(MeshData meshData) {
-        if (!initialized) {
-            initWindow();
-        }
+        ensureInitialized();
         return resourceManager.uploadMesh(meshData);
     }
 
     @Override
     public MaterialHandle uploadMaterial(MaterialData materialData) {
-        if (!initialized) {
-            initWindow();
-        }
+        ensureInitialized();
         return resourceManager.uploadMaterial(materialData);
     }
 
     @Override
     public TextureHandle uploadTexture(TextureData textureData) {
-        if (!initialized) {
-            initWindow();
-        }
+        ensureInitialized();
         return resourceManager.uploadTexture(textureData);
     }
 
-    private void initWindow() {
+    public void init() {
+        if (initialized) {
+            return;
+        }
         if (!GLFW.glfwInit()) {
             logger.error("Failed to initialize GLFW");
             throw new IllegalStateException("GLFW init failed");
@@ -157,39 +140,50 @@ public final class OpenGLRenderer implements MeshUploader {
         GL11.glClearColor(0.12f, 0.12f, 0.12f, 1.0f);
         uniforms = new RenderUniforms(800.0f / 600.0f);
         resourceManager.initDefaultTexture(TextureDataFactory.checkerboard(2, 1));
-        shaderProgram.init(vertexShaderSource(), fragmentShaderSource());
+        ShaderSource shaderSource = ShaderSourceLoader.loadByName(pendingShaderName);
+        shaderProgram.init(shaderSource.vertexSource(), shaderSource.fragmentSource());
         shaderProgram.bind();
         shaderProgram.setUniformMat4("uProjection", uniforms.projectionMatrix());
         shaderProgram.setUniformInt("uTexture", 0);
+        activeShaderName = pendingShaderName;
         initialized = true;
         logger.info("OpenGL context initialized");
     }
 
-    private String vertexShaderSource() {
-        return "#version 330 core\n"
-            + "layout(location = 0) in vec3 aPos;\n"
-            + "layout(location = 1) in vec3 aNormal;\n"
-            + "uniform mat4 uProjection;\n"
-            + "uniform mat4 uView;\n"
-            + "out vec3 vNormal;\n"
-            + "void main() {\n"
-            + "    vNormal = aNormal;\n"
-            + "    gl_Position = uProjection * uView * vec4(aPos, 1.0);\n"
-            + "}\n";
+    private void applyPendingShader() {
+        if (!shaderProgram.isInitialized()) {
+            return;
+        }
+        if (pendingShaderName.equals(activeShaderName)) {
+            return;
+        }
+        logger.info("Switching shader from {} to {}", activeShaderName, pendingShaderName);
+        ShaderSource shaderSource = ShaderSourceLoader.loadByName(pendingShaderName);
+        shaderProgram.dispose();
+        shaderProgram.init(shaderSource.vertexSource(), shaderSource.fragmentSource());
+        shaderProgram.bind();
+        shaderProgram.setUniformMat4("uProjection", uniforms.projectionMatrix());
+        shaderProgram.setUniformInt("uTexture", 0);
+        activeShaderName = pendingShaderName;
     }
 
-    private String fragmentShaderSource() {
-        return "#version 330 core\n"
-            + "in vec3 vNormal;\n"
-            + "uniform vec3 uLightDir;\n"
-            + "uniform vec3 uBaseColor;\n"
-            + "uniform sampler2D uTexture;\n"
-            + "out vec4 FragColor;\n"
-            + "void main() {\n"
-            + "    float diff = max(dot(normalize(vNormal), normalize(-uLightDir)), 0.0);\n"
-            + "    vec3 base = uBaseColor * texture(uTexture, vec2(0.5, 0.5)).rgb;\n"
-            + "    vec3 color = base * (0.2 + diff * 0.8);\n"
-            + "    FragColor = vec4(color, 1.0);\n"
-            + "}\n";
+    private void bindTextureUnit(int textureUnit, GpuTexture texture) {
+        GpuTexture resolved = texture != null ? texture : resourceManager.defaultTexture();
+        if (resolved == null) {
+            return;
+        }
+        GL13.glActiveTexture(textureUnit);
+        GL11.glBindTexture(GL11.GL_TEXTURE_2D, resolved.id());
+    }
+
+    public long windowHandle() {
+        ensureInitialized();
+        return window;
+    }
+
+    private void ensureInitialized() {
+        if (!initialized) {
+            throw new IllegalStateException("Renderer not initialized");
+        }
     }
 }
