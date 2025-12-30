@@ -19,12 +19,22 @@ public final class GameApplication {
 
     public GameApplication(EngineConfig config) {
         this.config = config;
-        this.renderer = new OpenGLRenderer(config.chunkCount());
+        this.renderer = new OpenGLRenderer(config.chunkCount(), config.shaderName());
         ModelImportService importService = ModelImportService.defaultService();
         importService.loadPlugins();
         Optional<Path> modelPath = ModelFileDialog.chooseModelFile();
+        modelPath.ifPresent(path -> logger.info("Selected model path: {}", path));
         Optional<ModelImporter.ImportedModel> importedModel = modelPath.flatMap(importService::importModel);
+        if (modelPath.isPresent() && importedModel.isEmpty()) {
+            throw new IllegalStateException("Selected model could not be imported.");
+        }
+        if (importedModel.isPresent()) {
+            logger.info("Imported model ready for rendering");
+        } else {
+            logger.info("No model selected; using default chunks");
+        }
         this.scene = Scene.bootstrap(config, renderer, importedModel);
+        RenderControlPanel.launch(scene, renderer);
         this.gameLoop = new GameLoop(config, new Time(), scene, renderer);
     }
 
