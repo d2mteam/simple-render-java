@@ -20,7 +20,6 @@ import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL13;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import com.simplerender.app.InputState;
 
 public final class OpenGLRenderer implements MeshUploader {
     private static final Logger logger = LoggerFactory.getLogger(OpenGLRenderer.class);
@@ -30,14 +29,9 @@ public final class OpenGLRenderer implements MeshUploader {
     private final GpuResourceManager resourceManager;
     private RenderUniforms uniforms;
     private boolean initialized;
-    private volatile String pendingShaderName;
+    private String pendingShaderName;
     private String activeShaderName;
     private long window;
-    private double lastMouseX;
-    private double lastMouseY;
-    private boolean firstMouse = true;
-    private final double[] cursorPosX = new double[1];
-    private final double[] cursorPosY = new double[1];
 
     private final String shaderName;
 
@@ -49,8 +43,9 @@ public final class OpenGLRenderer implements MeshUploader {
         this.pipeline = new RenderPipeline(new FrustumCuller());
         this.shaderProgram = new ShaderProgram();
         this.resourceManager = new GpuResourceManager();
-        this.pendingShaderName = "default";
-        this.activeShaderName = "default";
+        String resolved = shaderName != null && !shaderName.isBlank() ? shaderName : "default";
+        this.pendingShaderName = resolved;
+        this.activeShaderName = resolved;
         logger.info("Renderer initialized with {} GPU mesh slots", chunkCount);
     }
 
@@ -63,9 +58,7 @@ public final class OpenGLRenderer implements MeshUploader {
     }
 
     public void render(SceneSnapshot snapshot) {
-        if (!initialized) {
-            initWindow();
-        }
+        ensureInitialized();
         applyPendingShader();
         if (!pipeline.shouldRender(snapshot.camera())) {
             return;
@@ -92,7 +85,6 @@ public final class OpenGLRenderer implements MeshUploader {
             mesh.draw();
         }
         GLFW.glfwSwapBuffers(window);
-        logger.info("Rendered {} items", renderItems.length);
     }
 
     public void pollEvents() {
@@ -100,31 +92,6 @@ public final class OpenGLRenderer implements MeshUploader {
             return;
         }
         GLFW.glfwPollEvents();
-    }
-
-    public InputState readInput() {
-        if (!initialized) {
-            return new InputState(false, false, false, false, false, false, 0.0, 0.0);
-        }
-        boolean forward = GLFW.glfwGetKey(window, GLFW.GLFW_KEY_W) == GLFW.GLFW_PRESS;
-        boolean backward = GLFW.glfwGetKey(window, GLFW.GLFW_KEY_S) == GLFW.GLFW_PRESS;
-        boolean left = GLFW.glfwGetKey(window, GLFW.GLFW_KEY_A) == GLFW.GLFW_PRESS;
-        boolean right = GLFW.glfwGetKey(window, GLFW.GLFW_KEY_D) == GLFW.GLFW_PRESS;
-        boolean up = GLFW.glfwGetKey(window, GLFW.GLFW_KEY_SPACE) == GLFW.GLFW_PRESS;
-        boolean down = GLFW.glfwGetKey(window, GLFW.GLFW_KEY_LEFT_SHIFT) == GLFW.GLFW_PRESS;
-
-        GLFW.glfwGetCursorPos(window, cursorPosX, cursorPosY);
-        if (firstMouse) {
-            lastMouseX = cursorPosX[0];
-            lastMouseY = cursorPosY[0];
-            firstMouse = false;
-        }
-        double deltaX = cursorPosX[0] - lastMouseX;
-        double deltaY = cursorPosY[0] - lastMouseY;
-        lastMouseX = cursorPosX[0];
-        lastMouseY = cursorPosY[0];
-
-        return new InputState(forward, backward, left, right, up, down, deltaX, deltaY);
     }
 
     public boolean shouldClose() {
@@ -140,29 +107,26 @@ public final class OpenGLRenderer implements MeshUploader {
 
     @Override
     public MeshHandle uploadMesh(MeshData meshData) {
-        if (!initialized) {
-            initWindow();
-        }
+        ensureInitialized();
         return resourceManager.uploadMesh(meshData);
     }
 
     @Override
     public MaterialHandle uploadMaterial(MaterialData materialData) {
-        if (!initialized) {
-            initWindow();
-        }
+        ensureInitialized();
         return resourceManager.uploadMaterial(materialData);
     }
 
     @Override
     public TextureHandle uploadTexture(TextureData textureData) {
-        if (!initialized) {
-            initWindow();
-        }
+        ensureInitialized();
         return resourceManager.uploadTexture(textureData);
     }
 
-    private void initWindow() {
+    public void init() {
+        if (initialized) {
+            return;
+        }
         if (!GLFW.glfwInit()) {
             logger.error("Failed to initialize GLFW");
             throw new IllegalStateException("GLFW init failed");
@@ -210,10 +174,22 @@ public final class OpenGLRenderer implements MeshUploader {
     }
 
     private void bindTextureUnit(int textureUnit, GpuTexture texture) {
-        if (texture == null) {
+        GpuTexture resolved = texture != null ? texture : resourceManager.defaultTexture();
+        if (resolved == null) {
             return;
         }
         GL13.glActiveTexture(textureUnit);
-        GL11.glBindTexture(GL11.GL_TEXTURE_2D, texture.id());
+        GL11.glBindTexture(GL11.GL_TEXTURE_2D, resolved.id());
+    }
+
+    public long windowHandle() {
+        ensureInitialized();
+        return window;
+    }
+
+    private void ensureInitialized() {
+        if (!initialized) {
+            throw new IllegalStateException("Renderer not initialized");
+        }
     }
 }

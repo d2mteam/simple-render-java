@@ -23,6 +23,7 @@ public final class GameApplication {
         if (config.shaderName() != null && !config.shaderName().isBlank()) {
             this.renderer.requestShader(config.shaderName());
         }
+        this.renderer.init();
         ModelImportService importService = ModelImportService.defaultService();
         importService.loadPlugins();
         Optional<Path> modelPath = ModelFileDialog.chooseModelFile();
