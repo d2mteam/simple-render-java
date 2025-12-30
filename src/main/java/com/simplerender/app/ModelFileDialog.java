@@ -6,6 +6,8 @@ import java.nio.file.Path;
 import java.util.Optional;
 
 public final class ModelFileDialog {
+    private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(ModelFileDialog.class);
+
     private ModelFileDialog() {
     }
 
@@ -15,8 +17,11 @@ public final class ModelFileDialog {
         chooser.setFileFilter(new FileNameExtensionFilter("3D Models", "obj", "gltf", "glb"));
         int result = chooser.showOpenDialog(null);
         if (result != JFileChooser.APPROVE_OPTION) {
+            logger.info("Model selection canceled");
             return Optional.empty();
         }
-        return Optional.of(chooser.getSelectedFile().toPath());
+        Path selected = chooser.getSelectedFile().toPath();
+        logger.info("Model selected: {}", selected);
+        return Optional.of(selected);
     }
 }
