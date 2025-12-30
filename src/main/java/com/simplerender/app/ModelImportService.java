@@ -91,6 +91,32 @@ public final class ModelImportService {
         } catch (IOException e) {
             logger.warn("Failed to prepare plugin jars", e);
         }
+        prepareDevelopmentPlugins(devPlugins);
         return new ModelImportService(devPlugins);
+    }
+
+    private static void prepareDevelopmentPlugins(Path devPlugins) {
+        if (!Files.exists(devPlugins)) {
+            return;
+        }
+        try (Stream<Path> pluginDirs = Files.list(devPlugins)) {
+            pluginDirs.filter(Files::isDirectory).forEach(pluginDir -> {
+                Path descriptor = pluginDir.resolve("plugin.properties");
+                if (Files.exists(descriptor)) {
+                    return;
+                }
+                Path resourceDescriptor = pluginDir.resolve(Paths.get("src", "main", "resources", "plugin.properties"));
+                if (Files.exists(resourceDescriptor)) {
+                    try {
+                        Files.copy(resourceDescriptor, descriptor, StandardCopyOption.REPLACE_EXISTING);
+                        logger.info("Copied plugin descriptor for {}", pluginDir.getFileName());
+                    } catch (IOException e) {
+                        logger.warn("Failed to copy plugin descriptor for {}", pluginDir.getFileName(), e);
+                    }
+                }
+            });
+        } catch (IOException e) {
+            logger.warn("Failed to prepare development plugins", e);
+        }
     }
 }
