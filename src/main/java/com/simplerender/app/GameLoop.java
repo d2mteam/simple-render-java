@@ -31,7 +31,7 @@ public final class GameLoop {
         } else {
             logger.info("Game loop starting with maxFrames={}", config.maxFrames());
         }
-        while (!renderer.shouldClose() && (!limitFrames || frame < config.maxFrames())) {
+        while (!renderer.shouldClose()) {
             time.update();
             renderer.pollEvents();
             scene.update(time, inputReader.readInput(renderer.windowHandle()));

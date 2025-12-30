@@ -2,6 +2,7 @@ package com.simplerender.app;
 
 import com.simplerender.asset.plugin.ModelImporter;
 import org.pf4j.PluginManager;
+import org.pf4j.PluginWrapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -17,6 +18,10 @@ import java.util.stream.Stream;
 
 public final class ModelImportService {
     private static final Logger logger = LoggerFactory.getLogger(ModelImportService.class);
+    private static final String[] FALLBACK_IMPORTERS = {
+        "com.simplerender.plugin.obj.ObjModelImporter",
+        "com.simplerender.plugin.gltf.GltfModelImporter"
+    };
 
     private final PluginManager pluginManager;
 
@@ -104,6 +109,42 @@ public final class ModelImportService {
             return "";
         }
         return name.substring(dot + 1).toLowerCase();
+    }
+
+    private List<ModelImporter> resolveImporters() {
+        List<ModelImporter> importers = pluginManager.getExtensions(ModelImporter.class);
+        if (!importers.isEmpty()) {
+            return importers;
+        }
+        logger.warn("No extensions discovered by PF4J, attempting plugin classloader fallback.");
+        List<ModelImporter> fallback = new ArrayList<>();
+        for (PluginWrapper plugin : pluginManager.getPlugins()) {
+            ClassLoader loader = plugin.getPluginClassLoader();
+            for (String className : FALLBACK_IMPORTERS) {
+                addFallbackImporter(fallback, loader, className);
+            }
+        }
+        return fallback;
+    }
+
+    private void addFallbackImporter(List<ModelImporter> fallback, ClassLoader loader, String className) {
+        for (ModelImporter importer : fallback) {
+            if (importer.getClass().getName().equals(className)) {
+                return;
+            }
+        }
+        try {
+            Class<?> clazz = Class.forName(className, true, loader);
+            Object instance = clazz.getDeclaredConstructor().newInstance();
+            if (instance instanceof ModelImporter importer) {
+                fallback.add(importer);
+                logger.info("Fallback importer loaded: {}", className);
+            }
+        } catch (ClassNotFoundException e) {
+            logger.debug("Importer not found in plugin classloader: {}", className);
+        } catch (Exception e) {
+            logger.warn("Failed to instantiate importer {}", className, e);
+        }
     }
 
     public static ModelImportService defaultService() {
