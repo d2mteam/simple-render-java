@@ -70,8 +70,11 @@ public final class OpenGLRenderer implements MeshUploader {
             }
             shaderProgram.setUniformMat4("uModel", item.transform().matrix());
             shaderProgram.setUniformVec3("uBaseColor", material.baseColor());
-            GpuTexture texture = resourceManager.texture(material.baseColorTexture());
-            bindTextureUnit(GL13.GL_TEXTURE0, texture);
+            bindTextureUnit(GL13.GL_TEXTURE0, resourceManager.texture(material.baseColorTexture()));
+            bindTextureUnit(GL13.GL_TEXTURE1, resourceManager.texture(material.normalTexture()));
+            bindTextureUnit(GL13.GL_TEXTURE2, resourceManager.texture(material.metallicRoughnessTexture()));
+            bindTextureUnit(GL13.GL_TEXTURE3, resourceManager.texture(material.aoTexture()));
+            bindTextureUnit(GL13.GL_TEXTURE4, resourceManager.texture(material.emissiveTexture()));
             mesh.draw();
         }
         GLFW.glfwSwapBuffers(window);

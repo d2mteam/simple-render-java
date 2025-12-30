@@ -81,9 +81,17 @@ final class GpuResourceManager {
         return textures.get(defaultTexture);
     }
 
-    record GpuMaterial(float[] baseColor, TextureHandle textureHandle) {
-        TextureHandle baseColorTexture() {
-            return textureHandle;
-        }
+    private TextureHandle resolveTexture(java.util.Optional<TextureData> textureData) {
+        return textureData.map(this::uploadTexture).orElse(defaultTexture);
+    }
+
+    record GpuMaterial(
+        float[] baseColor,
+        TextureHandle baseColorTexture,
+        TextureHandle normalTexture,
+        TextureHandle metallicRoughnessTexture,
+        TextureHandle aoTexture,
+        TextureHandle emissiveTexture
+    ) {
     }
 }

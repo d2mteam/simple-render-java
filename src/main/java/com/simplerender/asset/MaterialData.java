@@ -11,8 +11,18 @@ public final class MaterialData {
     private final TextureData aoTexture;
     private final TextureData emissiveTexture;
 
-    public MaterialData(float[] baseColor, TextureData baseColorTexture, TextureData normalTexture,
-                        TextureData metallicRoughnessTexture, TextureData aoTexture, TextureData emissiveTexture) {
+    public MaterialData(float[] baseColor, TextureData textureData) {
+        this(baseColor, textureData, null, null, null, null);
+    }
+
+    public MaterialData(
+        float[] baseColor,
+        TextureData baseColorTexture,
+        TextureData normalTexture,
+        TextureData metallicRoughnessTexture,
+        TextureData aoTexture,
+        TextureData emissiveTexture
+    ) {
         if (baseColor.length != 3) {
             throw new IllegalArgumentException("Base color must have 3 components");
         }
@@ -26,6 +36,10 @@ public final class MaterialData {
 
     public float[] baseColor() {
         return Arrays.copyOf(baseColor, baseColor.length);
+    }
+
+    public Optional<TextureData> textureData() {
+        return Optional.ofNullable(baseColorTexture);
     }
 
     public Optional<TextureData> baseColorTexture() {
