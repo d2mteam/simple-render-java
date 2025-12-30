@@ -37,10 +37,17 @@ public final class OpenGLRenderer implements MeshUploader {
     private final double[] cursorPosX = new double[1];
     private final double[] cursorPosY = new double[1];
 
+    private final String shaderName;
+
     public OpenGLRenderer(int chunkCount) {
+        this(chunkCount, "default");
+    }
+
+    public OpenGLRenderer(int chunkCount, String shaderName) {
         this.pipeline = new RenderPipeline(new FrustumCuller());
         this.shaderProgram = new ShaderProgram();
         this.resourceManager = new GpuResourceManager();
+        this.shaderName = shaderName;
         logger.info("Renderer initialized with {} GPU mesh slots", chunkCount);
     }
 
@@ -159,7 +166,7 @@ public final class OpenGLRenderer implements MeshUploader {
         GL11.glClearColor(0.12f, 0.12f, 0.12f, 1.0f);
         uniforms = new RenderUniforms(800.0f / 600.0f);
         resourceManager.initDefaultTexture(TextureDataFactory.checkerboard(2, 1));
-        ShaderSource shaderSource = ShaderSourceLoader.load("shaders/default.vert", "shaders/default.frag");
+        ShaderSource shaderSource = ShaderSourceLoader.loadByName(shaderName);
         shaderProgram.init(shaderSource.vertexSource(), shaderSource.fragmentSource());
         shaderProgram.bind();
         shaderProgram.setUniformMat4("uProjection", uniforms.projectionMatrix());
