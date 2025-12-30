@@ -5,9 +5,15 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.simplerender.asset.MaterialData;
 import com.simplerender.asset.MeshData;
+import com.simplerender.asset.TextureData;
 import com.simplerender.asset.plugin.ModelImporter;
 import org.pf4j.Extension;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
+import javax.imageio.ImageIO;
+import java.awt.image.BufferedImage;
+import java.io.ByteArrayInputStream;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.file.Files;
@@ -16,6 +22,8 @@ import java.util.Base64;
 
 @Extension
 public final class GltfModelImporter implements ModelImporter {
+    private static final Logger logger = LoggerFactory.getLogger(GltfModelImporter.class);
+
     @Override
     public String[] supportedExtensions() {
         return new String[] {"gltf", "glb"};
@@ -47,6 +55,7 @@ public final class GltfModelImporter implements ModelImporter {
                 : sequentialIndices(positions.length / 3);
 
             float[] baseColor = new float[] {0.8f, 0.8f, 0.8f};
+            TextureData textureData = null;
             if (root.has("materials")) {
                 JsonObject material = root.getAsJsonArray("materials").get(0).getAsJsonObject();
                 if (material.has("pbrMetallicRoughness")) {
@@ -59,11 +68,12 @@ public final class GltfModelImporter implements ModelImporter {
                             color.get(2).getAsFloat()
                         };
                     }
+                    textureData = loadBaseColorTexture(pbr, root, bufferBytes, path.getParent());
                 }
             }
 
             MeshData meshData = new MeshData(positions, normals, indices);
-            MaterialData materialData = new MaterialData(baseColor, null);
+            MaterialData materialData = new MaterialData(baseColor, textureData);
             return new ImportedModel(meshData, materialData);
         } catch (Exception e) {
             throw new IllegalStateException("Failed to import glTF: " + path, e);
@@ -119,6 +129,84 @@ public final class GltfModelImporter implements ModelImporter {
             return Base64.getDecoder().decode(base64);
         }
         return Files.readAllBytes(base.resolve(uri));
+    }
+
+    private TextureData loadBaseColorTexture(
+        JsonObject pbr,
+        JsonObject root,
+        byte[] bufferBytes,
+        Path baseDir
+    ) {
+        if (!pbr.has("baseColorTexture")) {
+            return null;
+        }
+        if (!root.has("textures") || !root.has("images")) {
+            logger.warn("glTF texture referenced but textures/images arrays are missing");
+            return null;
+        }
+        int textureIndex = pbr.getAsJsonObject("baseColorTexture").get("index").getAsInt();
+        JsonObject texture = root.getAsJsonArray("textures").get(textureIndex).getAsJsonObject();
+        if (!texture.has("source")) {
+            logger.warn("glTF texture {} has no source index", textureIndex);
+            return null;
+        }
+        int sourceIndex = texture.get("source").getAsInt();
+        JsonObject image = root.getAsJsonArray("images").get(sourceIndex).getAsJsonObject();
+        try {
+            byte[] imageBytes = readImageBytes(image, root, bufferBytes, baseDir);
+            if (imageBytes == null) {
+                return null;
+            }
+            BufferedImage bufferedImage = ImageIO.read(new ByteArrayInputStream(imageBytes));
+            if (bufferedImage == null) {
+                logger.warn("Failed to decode glTF texture image {}", sourceIndex);
+                return null;
+            }
+            logger.info("Loaded glTF texture image {}", sourceIndex);
+            return buildTextureData(bufferedImage);
+        } catch (Exception e) {
+            logger.warn("Failed to load glTF texture image {}", sourceIndex, e);
+            return null;
+        }
+    }
+
+    private byte[] readImageBytes(JsonObject image, JsonObject root, byte[] bufferBytes, Path baseDir)
+        throws Exception {
+        if (image.has("uri")) {
+            String uri = image.get("uri").getAsString();
+            return decodeUri(uri, baseDir);
+        }
+        if (!image.has("bufferView")) {
+            logger.warn("glTF image missing uri and bufferView");
+            return null;
+        }
+        int bufferViewIndex = image.get("bufferView").getAsInt();
+        JsonObject bufferView = root.getAsJsonArray("bufferViews").get(bufferViewIndex).getAsJsonObject();
+        int offset = bufferView.has("byteOffset") ? bufferView.get("byteOffset").getAsInt() : 0;
+        int length = bufferView.get("byteLength").getAsInt();
+        if (offset + length > bufferBytes.length) {
+            throw new IllegalArgumentException("glTF image bufferView exceeds buffer length");
+        }
+        byte[] imageBytes = new byte[length];
+        System.arraycopy(bufferBytes, offset, imageBytes, 0, length);
+        return imageBytes;
+    }
+
+    private TextureData buildTextureData(BufferedImage image) {
+        int width = image.getWidth();
+        int height = image.getHeight();
+        byte[] rgba = new byte[width * height * 4];
+        int index = 0;
+        for (int y = 0; y < height; y++) {
+            for (int x = 0; x < width; x++) {
+                int argb = image.getRGB(x, y);
+                rgba[index++] = (byte) ((argb >> 16) & 0xFF);
+                rgba[index++] = (byte) ((argb >> 8) & 0xFF);
+                rgba[index++] = (byte) (argb & 0xFF);
+                rgba[index++] = (byte) ((argb >> 24) & 0xFF);
+            }
+        }
+        return new TextureData(width, height, rgba);
     }
 
     private float[] readFloatVec3(JsonArray accessors, JsonArray bufferViews, byte[] bufferBytes, int accessorIndex) {

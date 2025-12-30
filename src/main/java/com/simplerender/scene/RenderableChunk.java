@@ -13,6 +13,11 @@ public final class RenderableChunk {
         this.renderItem = renderItem;
     }
 
+    public void updateTransform(float x, float y, float z, float scale) {
+        renderItem.transform().setPosition(x, y, z);
+        renderItem.transform().setScale(scale);
+    }
+
     public RenderItem snapshot() {
         return renderItem;
     }
