@@ -2,6 +2,7 @@ package com.simplerender;
 
 import com.simplerender.app.EngineConfig;
 import com.simplerender.app.GameApplication;
+import com.simplerender.ui.ModelSelectionDialog;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -12,7 +13,8 @@ public final class Main {
     }
 
     public static void main(String[] args) {
-        EngineConfig config = EngineConfig.defaultConfig();
+        EngineConfig config = EngineConfig.defaultConfig()
+            .withModelPath(ModelSelectionDialog.chooseModelPath());
         logger.info("Starting Simple Render with {} chunks (seed={})", config.chunkCount(), config.randomSeed());
         GameApplication application = new GameApplication(config);
         application.run();

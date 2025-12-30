@@ -5,12 +5,14 @@ public final class EngineConfig {
     private final int maxFrames;
     private final int chunkCount;
     private final long randomSeed;
+    private final String modelPath;
 
-    public EngineConfig(int targetFps, int maxFrames, int chunkCount, long randomSeed) {
+    public EngineConfig(int targetFps, int maxFrames, int chunkCount, long randomSeed, String modelPath) {
         this.targetFps = targetFps;
         this.maxFrames = maxFrames;
         this.chunkCount = chunkCount;
         this.randomSeed = randomSeed;
+        this.modelPath = modelPath;
     }
 
     public int targetFps() {
@@ -29,7 +31,15 @@ public final class EngineConfig {
         return randomSeed;
     }
 
+    public String modelPath() {
+        return modelPath;
+    }
+
+    public EngineConfig withModelPath(String modelPath) {
+        return new EngineConfig(targetFps, maxFrames, chunkCount, randomSeed, modelPath);
+    }
+
     public static EngineConfig defaultConfig() {
-        return new EngineConfig(60, 3, 3, 1337L);
+        return new EngineConfig(60, 3, 3, 1337L, null);
     }
 }

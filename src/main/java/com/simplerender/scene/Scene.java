@@ -4,8 +4,8 @@ import com.simplerender.app.EngineConfig;
 import com.simplerender.app.Time;
 import com.simplerender.camera.Camera;
 import com.simplerender.camera.CameraController;
+import com.simplerender.model.ModelImportService;
 import com.simplerender.world.ChunkMeshData;
-import com.simplerender.world.ChunkMeshDataFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -25,7 +25,8 @@ public final class Scene {
     public static Scene bootstrap(EngineConfig config) {
         Camera camera = new Camera();
         CameraController cameraController = new CameraController();
-        ChunkMeshData[] meshData = ChunkMeshDataFactory.randomChunks(config.chunkCount(), config.randomSeed());
+        ModelImportService importService = new ModelImportService();
+        ChunkMeshData[] meshData = importService.loadFromConfig(config);
         RenderableChunk[] chunks = new RenderableChunk[meshData.length];
         for (int i = 0; i < meshData.length; i++) {
             chunks[i] = new RenderableChunk(meshData[i]);
