@@ -17,14 +17,16 @@ import java.util.Base64;
 @Extension
 public final class GltfModelImporter implements ModelImporter {
     @Override
+    public String[] supportedExtensions() {
+        return new String[] {"gltf", "glb"};
+    }
+
+    @Override
     public ImportedModel importModel(Path path) {
         try {
-            String json = Files.readString(path);
-            JsonObject root = JsonParser.parseString(json).getAsJsonObject();
-            JsonArray buffers = root.getAsJsonArray("buffers");
-            JsonObject buffer = buffers.get(0).getAsJsonObject();
-            String uri = buffer.get("uri").getAsString();
-            byte[] bufferBytes = decodeUri(uri, path.getParent());
+            GltfAsset asset = loadAsset(path);
+            JsonObject root = asset.root();
+            byte[] bufferBytes = asset.buffer();
 
             JsonArray bufferViews = root.getAsJsonArray("bufferViews");
             JsonArray accessors = root.getAsJsonArray("accessors");
@@ -66,6 +68,49 @@ public final class GltfModelImporter implements ModelImporter {
         } catch (Exception e) {
             throw new IllegalStateException("Failed to import glTF: " + path, e);
         }
+    }
+
+    private GltfAsset loadAsset(Path path) throws Exception {
+        if (path.toString().toLowerCase().endsWith(".glb")) {
+            return loadGlb(path);
+        }
+        String json = Files.readString(path);
+        JsonObject root = JsonParser.parseString(json).getAsJsonObject();
+        JsonArray buffers = root.getAsJsonArray("buffers");
+        JsonObject buffer = buffers.get(0).getAsJsonObject();
+        String uri = buffer.get("uri").getAsString();
+        byte[] bufferBytes = decodeUri(uri, path.getParent());
+        return new GltfAsset(root, bufferBytes);
+    }
+
+    private GltfAsset loadGlb(Path path) throws Exception {
+        byte[] bytes = Files.readAllBytes(path);
+        ByteBuffer buffer = ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN);
+        int magic = buffer.getInt();
+        if (magic != 0x46546C67) { // "glTF"
+            throw new IllegalArgumentException("Invalid GLB header");
+        }
+        buffer.getInt(); // version
+        buffer.getInt(); // length
+        int jsonLength = buffer.getInt();
+        int jsonType = buffer.getInt();
+        if (jsonType != 0x4E4F534A) { // "JSON"
+            throw new IllegalArgumentException("Missing JSON chunk");
+        }
+        byte[] jsonBytes = new byte[jsonLength];
+        buffer.get(jsonBytes);
+        String json = new String(jsonBytes);
+
+        int binLength = buffer.getInt();
+        int binType = buffer.getInt();
+        if (binType != 0x004E4942) { // "BIN"
+            throw new IllegalArgumentException("Missing BIN chunk");
+        }
+        byte[] binBytes = new byte[binLength];
+        buffer.get(binBytes);
+
+        JsonObject root = JsonParser.parseString(json).getAsJsonObject();
+        return new GltfAsset(root, binBytes);
     }
 
     private byte[] decodeUri(String uri, Path base) throws Exception {
@@ -145,5 +190,8 @@ public final class GltfModelImporter implements ModelImporter {
             indices[i] = i;
         }
         return indices;
+    }
+
+    private record GltfAsset(JsonObject root, byte[] buffer) {
     }
 }

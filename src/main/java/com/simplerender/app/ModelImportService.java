@@ -38,7 +38,12 @@ public final class ModelImportService {
     }
 
     private boolean importerSupports(ModelImporter importer, String extension) {
-        return importer.getClass().getSimpleName().toLowerCase().contains(extension);
+        for (String supported : importer.supportedExtensions()) {
+            if (supported.equalsIgnoreCase(extension)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private String extension(Path path) {
@@ -51,6 +56,10 @@ public final class ModelImportService {
     }
 
     public static ModelImportService defaultService() {
+        Path buildPlugins = Paths.get("build", "plugins");
+        if (buildPlugins.toFile().exists()) {
+            return new ModelImportService(buildPlugins);
+        }
         return new ModelImportService(Paths.get("plugins"));
     }
 }

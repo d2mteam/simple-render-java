@@ -17,6 +17,11 @@ import java.util.List;
 @Extension
 public final class ObjModelImporter implements ModelImporter {
     @Override
+    public String[] supportedExtensions() {
+        return new String[] {"obj"};
+    }
+
+    @Override
     public ImportedModel importModel(Path path) {
         ObjData objData = parseObj(path);
         float[] positions = objData.positions();

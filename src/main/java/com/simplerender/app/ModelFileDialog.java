@@ -12,7 +12,7 @@ public final class ModelFileDialog {
     public static Optional<Path> chooseModelFile() {
         JFileChooser chooser = new JFileChooser();
         chooser.setDialogTitle("Select 3D Model");
-        chooser.setFileFilter(new FileNameExtensionFilter("3D Models", "obj", "gltf"));
+        chooser.setFileFilter(new FileNameExtensionFilter("3D Models", "obj", "gltf", "glb"));
         int result = chooser.showOpenDialog(null);
         if (result != JFileChooser.APPROVE_OPTION) {
             return Optional.empty();

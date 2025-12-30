@@ -31,3 +31,14 @@ dependencies {
 test {
     useJUnitPlatform()
 }
+
+tasks.register('buildPlugins') {
+    dependsOn(':plugins:obj-plugin:jar', ':plugins:gltf-plugin:jar')
+}
+
+tasks.register('copyPlugins', Copy) {
+    dependsOn('buildPlugins')
+    from(project(':plugins:obj-plugin').tasks.named('jar').map { it.archiveFile })
+    from(project(':plugins:gltf-plugin').tasks.named('jar').map { it.archiveFile })
+    into("${buildDir}/plugins")
+}
