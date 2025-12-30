@@ -56,11 +56,7 @@ public final class GltfModelImporter implements ModelImporter {
                 : sequentialIndices(positions.length / 3);
 
             float[] baseColor = new float[] {0.8f, 0.8f, 0.8f};
-            TextureData baseColorTexture = null;
-            TextureData metallicRoughnessTexture = null;
-            TextureData normalTexture = null;
-            TextureData occlusionTexture = null;
-            TextureData emissiveTexture = null;
+            TextureData textureData = null;
             if (root.has("materials")) {
                 JsonObject material = root.getAsJsonArray("materials").get(0).getAsJsonObject();
                 if (material.has("pbrMetallicRoughness")) {
@@ -73,38 +69,12 @@ public final class GltfModelImporter implements ModelImporter {
                             color.get(2).getAsFloat()
                         };
                     }
-                    if (pbr.has("baseColorTexture")) {
-                        baseColorTexture = readTexture(root, bufferViews, bufferBytes, path.getParent(),
-                            pbr.getAsJsonObject("baseColorTexture"));
-                    }
-                    if (pbr.has("metallicRoughnessTexture")) {
-                        metallicRoughnessTexture = readTexture(root, bufferViews, bufferBytes, path.getParent(),
-                            pbr.getAsJsonObject("metallicRoughnessTexture"));
-                    }
-                }
-                if (material.has("normalTexture")) {
-                    normalTexture = readTexture(root, bufferViews, bufferBytes, path.getParent(),
-                        material.getAsJsonObject("normalTexture"));
-                }
-                if (material.has("occlusionTexture")) {
-                    occlusionTexture = readTexture(root, bufferViews, bufferBytes, path.getParent(),
-                        material.getAsJsonObject("occlusionTexture"));
-                }
-                if (material.has("emissiveTexture")) {
-                    emissiveTexture = readTexture(root, bufferViews, bufferBytes, path.getParent(),
-                        material.getAsJsonObject("emissiveTexture"));
+                    textureData = loadBaseColorTexture(pbr, root, bufferBytes, path.getParent());
                 }
             }
 
             MeshData meshData = new MeshData(positions, normals, indices);
-            MaterialData materialData = new MaterialData(
-                baseColor,
-                baseColorTexture,
-                metallicRoughnessTexture,
-                normalTexture,
-                occlusionTexture,
-                emissiveTexture
-            );
+            MaterialData materialData = new MaterialData(baseColor, textureData);
             return new ImportedModel(meshData, materialData);
         } catch (Exception e) {
             throw new IllegalStateException("Failed to import glTF: " + path, e);
@@ -162,71 +132,68 @@ public final class GltfModelImporter implements ModelImporter {
         return Files.readAllBytes(base.resolve(uri));
     }
 
-    private TextureData readTexture(
+    private TextureData loadBaseColorTexture(
+        JsonObject pbr,
         JsonObject root,
-        JsonArray bufferViews,
         byte[] bufferBytes,
-        Path basePath,
-        JsonObject textureInfo
-    ) throws Exception {
-        if (textureInfo == null || !textureInfo.has("index")) {
+        Path baseDir
+    ) {
+        if (!pbr.has("baseColorTexture")) {
             return null;
         }
         if (!root.has("textures") || !root.has("images")) {
+            logger.warn("glTF texture referenced but textures/images arrays are missing");
             return null;
         }
-        int textureIndex = textureInfo.get("index").getAsInt();
-        JsonArray textures = root.getAsJsonArray("textures");
-        if (textureIndex < 0 || textureIndex >= textures.size()) {
-            return null;
-        }
-        JsonObject texture = textures.get(textureIndex).getAsJsonObject();
+        int textureIndex = pbr.getAsJsonObject("baseColorTexture").get("index").getAsInt();
+        JsonObject texture = root.getAsJsonArray("textures").get(textureIndex).getAsJsonObject();
         if (!texture.has("source")) {
+            logger.warn("glTF texture {} has no source index", textureIndex);
             return null;
         }
-        int imageIndex = texture.get("source").getAsInt();
-        JsonArray images = root.getAsJsonArray("images");
-        if (imageIndex < 0 || imageIndex >= images.size()) {
+        int sourceIndex = texture.get("source").getAsInt();
+        JsonObject image = root.getAsJsonArray("images").get(sourceIndex).getAsJsonObject();
+        try {
+            byte[] imageBytes = readImageBytes(image, root, bufferBytes, baseDir);
+            if (imageBytes == null) {
+                return null;
+            }
+            BufferedImage bufferedImage = ImageIO.read(new ByteArrayInputStream(imageBytes));
+            if (bufferedImage == null) {
+                logger.warn("Failed to decode glTF texture image {}", sourceIndex);
+                return null;
+            }
+            logger.info("Loaded glTF texture image {}", sourceIndex);
+            return buildTextureData(bufferedImage);
+        } catch (Exception e) {
+            logger.warn("Failed to load glTF texture image {}", sourceIndex, e);
             return null;
         }
-        JsonObject image = images.get(imageIndex).getAsJsonObject();
-        byte[] imageBytes = readImageBytes(bufferViews, bufferBytes, basePath, image);
-        if (imageBytes == null) {
-            return null;
-        }
-        return decodeImageToTexture(imageBytes);
     }
 
-    private byte[] readImageBytes(
-        JsonArray bufferViews,
-        byte[] bufferBytes,
-        Path basePath,
-        JsonObject image
-    ) throws Exception {
+    private byte[] readImageBytes(JsonObject image, JsonObject root, byte[] bufferBytes, Path baseDir)
+        throws Exception {
         if (image.has("uri")) {
-            return decodeUri(image.get("uri").getAsString(), basePath);
+            String uri = image.get("uri").getAsString();
+            return decodeUri(uri, baseDir);
         }
-        if (image.has("bufferView")) {
-            int bufferViewIndex = image.get("bufferView").getAsInt();
-            if (bufferViewIndex < 0 || bufferViewIndex >= bufferViews.size()) {
-                return null;
-            }
-            JsonObject bufferView = bufferViews.get(bufferViewIndex).getAsJsonObject();
-            int viewOffset = bufferView.has("byteOffset") ? bufferView.get("byteOffset").getAsInt() : 0;
-            int length = bufferView.get("byteLength").getAsInt();
-            if (bufferBytes == null || bufferBytes.length < viewOffset + length) {
-                return null;
-            }
-            return Arrays.copyOfRange(bufferBytes, viewOffset, viewOffset + length);
-        }
-        return null;
-    }
-
-    private TextureData decodeImageToTexture(byte[] imageBytes) throws Exception {
-        BufferedImage image = ImageIO.read(new ByteArrayInputStream(imageBytes));
-        if (image == null) {
+        if (!image.has("bufferView")) {
+            logger.warn("glTF image missing uri and bufferView");
             return null;
         }
+        int bufferViewIndex = image.get("bufferView").getAsInt();
+        JsonObject bufferView = root.getAsJsonArray("bufferViews").get(bufferViewIndex).getAsJsonObject();
+        int offset = bufferView.has("byteOffset") ? bufferView.get("byteOffset").getAsInt() : 0;
+        int length = bufferView.get("byteLength").getAsInt();
+        if (offset + length > bufferBytes.length) {
+            throw new IllegalArgumentException("glTF image bufferView exceeds buffer length");
+        }
+        byte[] imageBytes = new byte[length];
+        System.arraycopy(bufferBytes, offset, imageBytes, 0, length);
+        return imageBytes;
+    }
+
+    private TextureData buildTextureData(BufferedImage image) {
         int width = image.getWidth();
         int height = image.getHeight();
         byte[] rgba = new byte[width * height * 4];

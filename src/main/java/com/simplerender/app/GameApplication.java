@@ -34,6 +34,7 @@ public final class GameApplication {
             logger.info("No model selected; using default chunks");
         }
         this.scene = Scene.bootstrap(config, renderer, importedModel);
+        RenderControlPanel.launch(scene, renderer);
         this.gameLoop = new GameLoop(config, new Time(), scene, renderer);
     }
 

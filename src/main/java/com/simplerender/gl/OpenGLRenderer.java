@@ -30,6 +30,8 @@ public final class OpenGLRenderer implements MeshUploader {
     private final GpuResourceManager resourceManager;
     private RenderUniforms uniforms;
     private boolean initialized;
+    private volatile String pendingShaderName;
+    private String activeShaderName;
     private long window;
     private double lastMouseX;
     private double lastMouseY;
@@ -47,14 +49,24 @@ public final class OpenGLRenderer implements MeshUploader {
         this.pipeline = new RenderPipeline(new FrustumCuller());
         this.shaderProgram = new ShaderProgram();
         this.resourceManager = new GpuResourceManager();
-        this.shaderName = shaderName;
+        this.pendingShaderName = "default";
+        this.activeShaderName = "default";
         logger.info("Renderer initialized with {} GPU mesh slots", chunkCount);
+    }
+
+    public OpenGLRenderer(int chunkCount, String shaderName) {
+        this(chunkCount);
+        if (shaderName != null && !shaderName.isBlank()) {
+            this.pendingShaderName = shaderName;
+            this.activeShaderName = shaderName;
+        }
     }
 
     public void render(SceneSnapshot snapshot) {
         if (!initialized) {
             initWindow();
         }
+        applyPendingShader();
         if (!pipeline.shouldRender(snapshot.camera())) {
             return;
         }
@@ -73,6 +85,7 @@ public final class OpenGLRenderer implements MeshUploader {
                 logger.error("Missing GPU resources for render item {}", i);
                 continue;
             }
+            shaderProgram.setUniformMat4("uModel", item.transform().matrix());
             shaderProgram.setUniformVec3("uBaseColor", material.baseColor());
             bindTextureUnit(GL13.GL_TEXTURE0, material.baseColorTexture());
             bindTextureUnit(GL13.GL_TEXTURE1, material.normalTexture());
@@ -121,6 +134,13 @@ public final class OpenGLRenderer implements MeshUploader {
         return initialized && GLFW.glfwWindowShouldClose(window);
     }
 
+    public void requestShader(String shaderName) {
+        if (shaderName == null || shaderName.isBlank()) {
+            return;
+        }
+        pendingShaderName = shaderName;
+    }
+
     @Override
     public MeshHandle uploadMesh(MeshData meshData) {
         if (!initialized) {
@@ -166,25 +186,29 @@ public final class OpenGLRenderer implements MeshUploader {
         GL11.glClearColor(0.12f, 0.12f, 0.12f, 1.0f);
         uniforms = new RenderUniforms(800.0f / 600.0f);
         resourceManager.initDefaultTexture(TextureDataFactory.checkerboard(2, 1));
-        ShaderSource shaderSource = ShaderSourceLoader.loadByName(shaderName);
+        ShaderSource shaderSource = ShaderSourceLoader.loadByName(pendingShaderName);
         shaderProgram.init(shaderSource.vertexSource(), shaderSource.fragmentSource());
         shaderProgram.bind();
         shaderProgram.setUniformMat4("uProjection", uniforms.projectionMatrix());
-        shaderProgram.setUniformInt("uBaseColorTexture", 0);
-        shaderProgram.setUniformInt("uNormalTexture", 1);
-        shaderProgram.setUniformInt("uMetallicRoughnessTexture", 2);
-        shaderProgram.setUniformInt("uAoTexture", 3);
-        shaderProgram.setUniformInt("uEmissiveTexture", 4);
+        shaderProgram.setUniformInt("uTexture", 0);
+        activeShaderName = pendingShaderName;
         initialized = true;
         logger.info("OpenGL context initialized");
     }
 
-    private void bindTextureUnit(int unit, TextureHandle handle) {
-        GpuTexture texture = resourceManager.texture(handle);
-        if (texture == null) {
+    private void applyPendingShader() {
+        if (!shaderProgram.isInitialized()) {
             return;
         }
-        GL13.glActiveTexture(unit);
-        GL11.glBindTexture(GL11.GL_TEXTURE_2D, texture.id());
+        if (pendingShaderName.equals(activeShaderName)) {
+            return;
+        }
+        ShaderSource shaderSource = ShaderSourceLoader.loadByName(pendingShaderName);
+        shaderProgram.dispose();
+        shaderProgram.init(shaderSource.vertexSource(), shaderSource.fragmentSource());
+        shaderProgram.bind();
+        shaderProgram.setUniformMat4("uProjection", uniforms.projectionMatrix());
+        shaderProgram.setUniformInt("uTexture", 0);
+        activeShaderName = pendingShaderName;
     }
 }
