@@ -22,12 +22,7 @@ public final class GameApplication {
         this.renderer = new OpenGLRenderer(config.chunkCount());
         ModelImportService importService = ModelImportService.defaultService();
         importService.loadPlugins();
-        if (config.modelPath() != null) {
-            logger.info("Configured model path: {}", config.modelPath());
-        }
-        Optional<Path> modelPath = Optional.ofNullable(config.modelPath())
-            .map(Path::of)
-            .or(() -> ModelFileDialog.chooseModelFile());
+        Optional<Path> modelPath = ModelFileDialog.chooseModelFile();
         modelPath.ifPresent(path -> logger.info("Selected model path: {}", path));
         Optional<ModelImporter.ImportedModel> importedModel = modelPath.flatMap(importService::importModel);
         if (modelPath.isPresent() && importedModel.isEmpty()) {
