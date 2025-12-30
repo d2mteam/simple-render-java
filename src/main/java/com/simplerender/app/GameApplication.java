@@ -22,8 +22,13 @@ public final class GameApplication {
         this.renderer = new OpenGLRenderer(config.chunkCount());
         ModelImportService importService = ModelImportService.defaultService();
         importService.loadPlugins();
-        Optional<Path> modelPath = ModelFileDialog.chooseModelFile();
+        Optional<Path> modelPath = Optional.ofNullable(config.modelPath())
+            .map(Path::of)
+            .or(() -> ModelFileDialog.chooseModelFile());
         Optional<ModelImporter.ImportedModel> importedModel = modelPath.flatMap(importService::importModel);
+        if (modelPath.isPresent() && importedModel.isEmpty()) {
+            throw new IllegalStateException("Selected model could not be imported.");
+        }
         this.scene = Scene.bootstrap(config, renderer, importedModel);
         this.gameLoop = new GameLoop(config, new Time(), scene, renderer);
     }
