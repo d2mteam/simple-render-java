@@ -1,19 +1,19 @@
 package com.simplerender.scene;
 
-import com.simplerender.world.ChunkMeshData;
+import com.simplerender.render.RenderItem;
 
 public final class RenderableChunk {
-    private ChunkMeshData meshData;
+    private RenderItem renderItem;
 
-    public RenderableChunk(ChunkMeshData meshData) {
-        this.meshData = meshData;
+    public RenderableChunk(RenderItem renderItem) {
+        this.renderItem = renderItem;
     }
 
-    public void updateMesh(ChunkMeshData meshData) {
-        this.meshData = meshData;
+    public void updateRenderItem(RenderItem renderItem) {
+        this.renderItem = renderItem;
     }
 
-    public ChunkMeshData snapshot() {
-        return meshData;
+    public RenderItem snapshot() {
+        return renderItem;
     }
 }

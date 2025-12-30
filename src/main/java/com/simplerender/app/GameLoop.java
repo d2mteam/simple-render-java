@@ -31,7 +31,7 @@ public final class GameLoop {
         while (!renderer.shouldClose() && (!limitFrames || frame < config.maxFrames())) {
             time.update();
             renderer.pollEvents();
-            scene.update(time);
+            scene.update(time, renderer.readInput());
             renderer.render(scene.snapshot());
             logger.debug("Completed frame {}", frame);
             frame++;

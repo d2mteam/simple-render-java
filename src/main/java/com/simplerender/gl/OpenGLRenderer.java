@@ -1,35 +1,44 @@
 package com.simplerender.gl;
 
+import com.simplerender.asset.MaterialData;
+import com.simplerender.asset.MeshData;
+import com.simplerender.asset.TextureData;
+import com.simplerender.asset.TextureDataFactory;
+import com.simplerender.render.MaterialHandle;
+import com.simplerender.render.MeshHandle;
+import com.simplerender.render.MeshUploader;
+import com.simplerender.render.RenderItem;
+import com.simplerender.render.TextureHandle;
 import com.simplerender.render.culling.FrustumCuller;
-import com.simplerender.render.mesh.MeshCache;
 import com.simplerender.render.pipeline.RenderPipeline;
 import com.simplerender.scene.SceneSnapshot;
-import com.simplerender.world.ChunkMeshData;
 import org.lwjgl.glfw.GLFW;
 import org.lwjgl.opengl.GL;
 import org.lwjgl.opengl.GL11;
+import org.lwjgl.opengl.GL13;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import com.simplerender.app.InputState;
 
-public final class OpenGLRenderer {
+public final class OpenGLRenderer implements MeshUploader {
     private static final Logger logger = LoggerFactory.getLogger(OpenGLRenderer.class);
 
-    private final RenderPipeline[] pipelines;
-    private final GPUMesh[] gpuMeshes;
+    private final RenderPipeline pipeline;
     private final ShaderProgram shaderProgram;
-    private final float[] projectionMatrix;
+    private final GpuResourceManager resourceManager;
+    private RenderUniforms uniforms;
     private boolean initialized;
     private long window;
+    private double lastMouseX;
+    private double lastMouseY;
+    private boolean firstMouse = true;
+    private final double[] cursorPosX = new double[1];
+    private final double[] cursorPosY = new double[1];
 
     public OpenGLRenderer(int chunkCount) {
-        this.pipelines = new RenderPipeline[chunkCount];
-        this.gpuMeshes = new GPUMesh[chunkCount];
+        this.pipeline = new RenderPipeline(new FrustumCuller());
         this.shaderProgram = new ShaderProgram();
-        this.projectionMatrix = createOrthoMatrix(0.0f, 20.0f, 0.0f, 20.0f, -1.0f, 1.0f);
-        for (int i = 0; i < chunkCount; i++) {
-            pipelines[i] = new RenderPipeline(new MeshCache(), new FrustumCuller());
-            gpuMeshes[i] = new GPUMesh();
-        }
+        this.resourceManager = new GpuResourceManager();
         logger.info("Renderer initialized with {} GPU mesh slots", chunkCount);
     }
 
@@ -37,30 +46,34 @@ public final class OpenGLRenderer {
         if (!initialized) {
             initWindow();
         }
-        if (pipelines.length == 0) {
-            logger.error("Renderer has no GPU mesh slots configured");
+        if (!pipeline.shouldRender(snapshot.camera())) {
             return;
         }
         GL11.glClear(GL11.GL_COLOR_BUFFER_BIT | GL11.GL_DEPTH_BUFFER_BIT);
         shaderProgram.bind();
-        ChunkMeshData[] chunks = snapshot.chunkMeshData();
-        int count = Math.min(chunks.length, gpuMeshes.length);
-        for (int i = 0; i < count; i++) {
-            ChunkMeshData chunk = chunks[i];
-            RenderPipeline pipeline = pipelines[i];
-            GPUMesh gpuMesh = gpuMeshes[i];
-            if (!pipeline.shouldRender(snapshot.camera(), chunk)) {
+        uniforms.updateView(snapshot.camera().position(), snapshot.camera().forward(), snapshot.camera().up());
+        shaderProgram.setUniformMat4("uProjection", uniforms.projectionMatrix());
+        shaderProgram.setUniformMat4("uView", uniforms.viewMatrix());
+        shaderProgram.setUniformVec3("uLightDir", uniforms.lightDirection());
+        RenderItem[] renderItems = snapshot.renderItems();
+        for (int i = 0; i < renderItems.length; i++) {
+            RenderItem item = renderItems[i];
+            GPUMesh mesh = resourceManager.mesh(item.meshHandle());
+            GpuResourceManager.GpuMaterial material = resourceManager.material(item.materialHandle());
+            if (mesh == null || material == null) {
+                logger.error("Missing GPU resources for render item {}", i);
                 continue;
             }
-            if (gpuMesh.needsUpload(chunk)) {
-                gpuMesh.upload(chunk);
-                pipeline.markUploaded(chunk);
-                logger.debug("Uploaded chunk {} with {} vertices", i, chunk.vertexCount());
+            shaderProgram.setUniformVec3("uBaseColor", material.baseColor());
+            GpuTexture texture = resourceManager.texture(material.textureHandle());
+            if (texture != null) {
+                GL13.glActiveTexture(GL13.GL_TEXTURE0);
+                GL11.glBindTexture(GL11.GL_TEXTURE_2D, texture.id());
             }
-            gpuMesh.draw();
+            mesh.draw();
         }
         GLFW.glfwSwapBuffers(window);
-        logger.info("Rendered {} chunks", count);
+        logger.info("Rendered {} items", renderItems.length);
     }
 
     public void pollEvents() {
@@ -70,8 +83,57 @@ public final class OpenGLRenderer {
         GLFW.glfwPollEvents();
     }
 
+    public InputState readInput() {
+        if (!initialized) {
+            return new InputState(false, false, false, false, false, false, 0.0, 0.0);
+        }
+        boolean forward = GLFW.glfwGetKey(window, GLFW.GLFW_KEY_W) == GLFW.GLFW_PRESS;
+        boolean backward = GLFW.glfwGetKey(window, GLFW.GLFW_KEY_S) == GLFW.GLFW_PRESS;
+        boolean left = GLFW.glfwGetKey(window, GLFW.GLFW_KEY_A) == GLFW.GLFW_PRESS;
+        boolean right = GLFW.glfwGetKey(window, GLFW.GLFW_KEY_D) == GLFW.GLFW_PRESS;
+        boolean up = GLFW.glfwGetKey(window, GLFW.GLFW_KEY_SPACE) == GLFW.GLFW_PRESS;
+        boolean down = GLFW.glfwGetKey(window, GLFW.GLFW_KEY_LEFT_SHIFT) == GLFW.GLFW_PRESS;
+
+        GLFW.glfwGetCursorPos(window, cursorPosX, cursorPosY);
+        if (firstMouse) {
+            lastMouseX = cursorPosX[0];
+            lastMouseY = cursorPosY[0];
+            firstMouse = false;
+        }
+        double deltaX = cursorPosX[0] - lastMouseX;
+        double deltaY = cursorPosY[0] - lastMouseY;
+        lastMouseX = cursorPosX[0];
+        lastMouseY = cursorPosY[0];
+
+        return new InputState(forward, backward, left, right, up, down, deltaX, deltaY);
+    }
+
     public boolean shouldClose() {
         return initialized && GLFW.glfwWindowShouldClose(window);
+    }
+
+    @Override
+    public MeshHandle uploadMesh(MeshData meshData) {
+        if (!initialized) {
+            initWindow();
+        }
+        return resourceManager.uploadMesh(meshData);
+    }
+
+    @Override
+    public MaterialHandle uploadMaterial(MaterialData materialData) {
+        if (!initialized) {
+            initWindow();
+        }
+        return resourceManager.uploadMaterial(materialData);
+    }
+
+    @Override
+    public TextureHandle uploadTexture(TextureData textureData) {
+        if (!initialized) {
+            initWindow();
+        }
+        return resourceManager.uploadTexture(textureData);
     }
 
     private void initWindow() {
@@ -88,43 +150,46 @@ public final class OpenGLRenderer {
         }
         GLFW.glfwMakeContextCurrent(window);
         GLFW.glfwSwapInterval(1);
+        GLFW.glfwSetInputMode(window, GLFW.GLFW_CURSOR, GLFW.GLFW_CURSOR_DISABLED);
         GLFW.glfwShowWindow(window);
         GL.createCapabilities();
         GL11.glEnable(GL11.GL_DEPTH_TEST);
         GL11.glClearColor(0.12f, 0.12f, 0.12f, 1.0f);
+        uniforms = new RenderUniforms(800.0f / 600.0f);
+        resourceManager.initDefaultTexture(TextureDataFactory.checkerboard(2, 1));
         shaderProgram.init(vertexShaderSource(), fragmentShaderSource());
         shaderProgram.bind();
-        shaderProgram.setUniformMat4("uProjection", projectionMatrix);
+        shaderProgram.setUniformMat4("uProjection", uniforms.projectionMatrix());
+        shaderProgram.setUniformInt("uTexture", 0);
         initialized = true;
         logger.info("OpenGL context initialized");
-    }
-
-    private float[] createOrthoMatrix(float left, float right, float bottom, float top, float near, float far) {
-        float[] m = new float[16];
-        m[0] = 2.0f / (right - left);
-        m[5] = 2.0f / (top - bottom);
-        m[10] = -2.0f / (far - near);
-        m[12] = -(right + left) / (right - left);
-        m[13] = -(top + bottom) / (top - bottom);
-        m[14] = -(far + near) / (far - near);
-        m[15] = 1.0f;
-        return m;
     }
 
     private String vertexShaderSource() {
         return "#version 330 core\n"
             + "layout(location = 0) in vec3 aPos;\n"
+            + "layout(location = 1) in vec3 aNormal;\n"
             + "uniform mat4 uProjection;\n"
+            + "uniform mat4 uView;\n"
+            + "out vec3 vNormal;\n"
             + "void main() {\n"
-            + "    gl_Position = uProjection * vec4(aPos, 1.0);\n"
+            + "    vNormal = aNormal;\n"
+            + "    gl_Position = uProjection * uView * vec4(aPos, 1.0);\n"
             + "}\n";
     }
 
     private String fragmentShaderSource() {
         return "#version 330 core\n"
+            + "in vec3 vNormal;\n"
+            + "uniform vec3 uLightDir;\n"
+            + "uniform vec3 uBaseColor;\n"
+            + "uniform sampler2D uTexture;\n"
             + "out vec4 FragColor;\n"
             + "void main() {\n"
-            + "    FragColor = vec4(0.2, 0.8, 0.4, 1.0);\n"
+            + "    float diff = max(dot(normalize(vNormal), normalize(-uLightDir)), 0.0);\n"
+            + "    vec3 base = uBaseColor * texture(uTexture, vec2(0.5, 0.5)).rgb;\n"
+            + "    vec3 color = base * (0.2 + diff * 0.8);\n"
+            + "    FragColor = vec4(color, 1.0);\n"
             + "}\n";
     }
 }
