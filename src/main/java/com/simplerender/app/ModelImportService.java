@@ -47,13 +47,21 @@ public final class ModelImportService {
             plugin.getDescriptor().getPluginId(),
             plugin.getPluginPath()
         ));
-        List<ModelImporter> importers = resolveImporters();
+        pluginManager.getPlugins().forEach(plugin -> {
+            boolean hasIndex = plugin.getPluginClassLoader()
+                .getResource("META-INF/extensions.idx") != null;
+            if (!hasIndex) {
+                logger.warn("Plugin {} is missing META-INF/extensions.idx", plugin.getDescriptor().getPluginId());
+            } else {
+                logger.info("Plugin {} has META-INF/extensions.idx", plugin.getDescriptor().getPluginId());
+            }
+        });
+        List<ModelImporter> importers = pluginManager.getExtensions(ModelImporter.class);
         if (importers.isEmpty()) {
-            logger.warn("No model importers found. Plugins may be missing compiled classes.");
+            logger.warn("No model importers found. Ensure plugin classes are compiled.");
         } else {
             for (ModelImporter importer : importers) {
-                logger.info(
-                    "Model importer available: {} supports {}",
+                logger.info("Model importer available: {} supports {}",
                     importer.getClass().getSimpleName(),
                     String.join(", ", importer.supportedExtensions())
                 );
@@ -64,7 +72,7 @@ public final class ModelImportService {
     public Optional<ModelImporter.ImportedModel> importModel(Path path) {
         String extension = extension(path);
         logger.info("Attempting to import model {} (extension: {})", path, extension);
-        List<ModelImporter> importers = resolveImporters();
+        List<ModelImporter> importers = pluginManager.getExtensions(ModelImporter.class);
         for (ModelImporter importer : importers) {
             if (importerSupports(importer, extension)) {
                 logger.info("Using importer {} for {}", importer.getClass().getSimpleName(), path);
