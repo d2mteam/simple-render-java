@@ -6,6 +6,8 @@ import com.simplerender.camera.Camera;
 import com.simplerender.camera.CameraController;
 import com.simplerender.model.ModelImportService;
 import com.simplerender.world.ChunkMeshData;
+import com.simplerender.world.ChunkMeshDataFactory;
+import java.nio.file.Path;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -25,14 +27,27 @@ public final class Scene {
     public static Scene bootstrap(EngineConfig config) {
         Camera camera = new Camera();
         CameraController cameraController = new CameraController();
-        ModelImportService importService = new ModelImportService();
-        ChunkMeshData[] meshData = importService.loadFromConfig(config);
+        ChunkMeshData[] meshData = loadMeshData(config);
         RenderableChunk[] chunks = new RenderableChunk[meshData.length];
         for (int i = 0; i < meshData.length; i++) {
             chunks[i] = new RenderableChunk(meshData[i]);
         }
         logger.info("Scene bootstrapped with {} chunks", chunks.length);
         return new Scene(camera, cameraController, chunks);
+    }
+
+    private static ChunkMeshData[] loadMeshData(EngineConfig config) {
+        String modelPath = config.modelPath();
+        if (modelPath == null || modelPath.isBlank()) {
+            return ChunkMeshDataFactory.randomChunks(config.chunkCount(), config.randomSeed());
+        }
+        ModelImportService importService = new ModelImportService();
+        ChunkMeshData imported = importService.importModel(Path.of(modelPath.trim()));
+        if (imported == null) {
+            logger.warn("Falling back to random chunks because model import failed");
+            return ChunkMeshDataFactory.randomChunks(config.chunkCount(), config.randomSeed());
+        }
+        return new ChunkMeshData[] {imported};
     }
 
     public void update(Time time) {
