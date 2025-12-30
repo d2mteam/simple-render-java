@@ -1,6 +1,17 @@
 package com.simplerender.app;
 
 public final class InputState {
+    private static final InputState IDLE = new InputState(
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        0.0,
+        0.0
+    );
+
     private final boolean forward;
     private final boolean backward;
     private final boolean left;
@@ -28,6 +39,10 @@ public final class InputState {
         this.down = down;
         this.mouseDeltaX = mouseDeltaX;
         this.mouseDeltaY = mouseDeltaY;
+    }
+
+    public static InputState idle() {
+        return IDLE;
     }
 
     public boolean forward() {
