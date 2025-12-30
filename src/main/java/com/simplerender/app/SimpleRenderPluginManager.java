@@ -14,7 +14,7 @@ public final class SimpleRenderPluginManager extends DefaultPluginManager {
     }
 
     @Override
-    protected RuntimeMode getRuntimeMode() {
+    public RuntimeMode getRuntimeMode() {
         return RuntimeMode.DEVELOPMENT;
     }
 
