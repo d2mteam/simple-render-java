@@ -18,6 +18,8 @@ import com.simplerender.render.RenderItem;
 import com.simplerender.render.Transform;
 import com.simplerender.world.ChunkMeshData;
 import com.simplerender.world.ChunkMeshDataFactory;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -27,9 +29,9 @@ public final class Scene {
 
     private final Camera camera;
     private final CameraController cameraController;
-    private final RenderableChunk[] chunks;
+    private final List<RenderableChunk> chunks;
 
-    private Scene(Camera camera, CameraController cameraController, RenderableChunk[] chunks) {
+    private Scene(Camera camera, CameraController cameraController, List<RenderableChunk> chunks) {
         this.camera = camera;
         this.cameraController = cameraController;
         this.chunks = chunks;
@@ -38,15 +40,15 @@ public final class Scene {
     public static Scene bootstrap(EngineConfig config, MeshUploader meshUploader, Optional<ModelImporter.ImportedModel> importedModel) {
         Camera camera = new Camera();
         CameraController cameraController = new CameraController();
-        RenderableChunk[] chunks = importedModel
-            .map(model -> new RenderableChunk[] {createFromImported(meshUploader, model)})
+        List<RenderableChunk> chunks = importedModel
+            .map(model -> List.of(createFromImported(meshUploader, model)))
             .orElseGet(() -> createRandomChunks(config, meshUploader));
         if (importedModel.isPresent()) {
             logger.info("Scene bootstrapped with imported model");
         } else {
             logger.info("Scene bootstrapped with default chunks");
         }
-        logger.info("Scene bootstrapped with {} chunks", chunks.length);
+        logger.info("Scene bootstrapped with {} chunks", chunks.size());
         return new Scene(camera, cameraController, chunks);
     }
 
@@ -59,27 +61,47 @@ public final class Scene {
     }
 
     public SceneSnapshot snapshot() {
-        RenderItem[] snapshots = new RenderItem[chunks.length];
-        for (int i = 0; i < chunks.length; i++) {
-            snapshots[i] = chunks[i].snapshot();
+        RenderItem[] snapshots = new RenderItem[chunks.size()];
+        for (int i = 0; i < chunks.size(); i++) {
+            snapshots[i] = chunks.get(i).snapshot();
         }
         logger.debug("Scene snapshot created for {} chunks", snapshots.length);
         return new SceneSnapshot(camera.snapshot(), snapshots);
     }
 
     public void updatePrimaryTransform(float x, float y, float z, float scale) {
-        if (chunks.length == 0) {
+        updateTransform(0, x, y, z, scale);
+    }
+
+    public void updateTransform(int index, float x, float y, float z, float scale) {
+        if (chunks.isEmpty()) {
             logger.warn("No renderable chunks available to update transform");
             return;
         }
-        chunks[0].updateTransform(x, y, z, scale);
-        logger.info("Updated primary object transform to ({}, {}, {}) scale {}", x, y, z, scale);
+        if (index < 0 || index >= chunks.size()) {
+            logger.warn("Transform index {} out of range (count={})", index, chunks.size());
+            return;
+        }
+        chunks.get(index).updateTransform(x, y, z, scale);
+        logger.info("Updated object {} transform to ({}, {}, {}) scale {}", index, x, y, z, scale);
     }
 
-    private static RenderableChunk[] createRandomChunks(EngineConfig config, MeshUploader meshUploader) {
+    public int addImportedObject(MeshUploader meshUploader, ModelImporter.ImportedModel model) {
+        RenderableChunk chunk = createFromImported(meshUploader, model);
+        chunks.add(chunk);
+        int index = chunks.size() - 1;
+        logger.info("Added imported object at index {}", index);
+        return index;
+    }
+
+    public int objectCount() {
+        return chunks.size();
+    }
+
+    private static List<RenderableChunk> createRandomChunks(EngineConfig config, MeshUploader meshUploader) {
         TextureData textureData = TextureDataFactory.checkerboard(32, 4);
         ChunkMeshData[] meshData = ChunkMeshDataFactory.randomChunks(config.chunkCount(), config.randomSeed());
-        RenderableChunk[] chunks = new RenderableChunk[meshData.length];
+        List<RenderableChunk> chunks = new ArrayList<>(meshData.length);
         for (int i = 0; i < meshData.length; i++) {
             MeshData mesh = MeshDataFactory.fromChunkMeshData(meshData[i]);
             MaterialData material = new MaterialData(
@@ -92,7 +114,7 @@ public final class Scene {
             );
             MeshHandle meshHandle = meshUploader.uploadMesh(mesh);
             MaterialHandle materialHandle = meshUploader.uploadMaterial(material);
-            chunks[i] = new RenderableChunk(new RenderItem(meshHandle, materialHandle, new Transform()));
+            chunks.add(new RenderableChunk(new RenderItem(meshHandle, materialHandle, new Transform())));
         }
         return chunks;
     }
