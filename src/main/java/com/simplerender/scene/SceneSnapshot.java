@@ -5,9 +5,9 @@ import com.simplerender.world.ChunkMeshData;
 
 public final class SceneSnapshot {
     private final CameraSnapshot camera;
-    private final ChunkMeshData chunkMeshData;
+    private final ChunkMeshData[] chunkMeshData;
 
-    public SceneSnapshot(CameraSnapshot camera, ChunkMeshData chunkMeshData) {
+    public SceneSnapshot(CameraSnapshot camera, ChunkMeshData[] chunkMeshData) {
         this.camera = camera;
         this.chunkMeshData = chunkMeshData;
     }
@@ -16,7 +16,7 @@ public final class SceneSnapshot {
         return camera;
     }
 
-    public ChunkMeshData chunkMeshData() {
+    public ChunkMeshData[] chunkMeshData() {
         return chunkMeshData;
     }
 }
