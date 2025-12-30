@@ -10,6 +10,7 @@ import org.lwjgl.opengl.GL;
 import org.lwjgl.opengl.GL11;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import com.simplerender.app.InputState;
 
 public final class OpenGLRenderer {
     private static final Logger logger = LoggerFactory.getLogger(OpenGLRenderer.class);
@@ -20,6 +21,11 @@ public final class OpenGLRenderer {
     private RenderUniforms uniforms;
     private boolean initialized;
     private long window;
+    private double lastMouseX;
+    private double lastMouseY;
+    private boolean firstMouse = true;
+    private final double[] cursorPosX = new double[1];
+    private final double[] cursorPosY = new double[1];
 
     public OpenGLRenderer(int chunkCount) {
         this.pipelines = new RenderPipeline[chunkCount];
@@ -73,6 +79,31 @@ public final class OpenGLRenderer {
         GLFW.glfwPollEvents();
     }
 
+    public InputState readInput() {
+        if (!initialized) {
+            return new InputState(false, false, false, false, false, false, 0.0, 0.0);
+        }
+        boolean forward = GLFW.glfwGetKey(window, GLFW.GLFW_KEY_W) == GLFW.GLFW_PRESS;
+        boolean backward = GLFW.glfwGetKey(window, GLFW.GLFW_KEY_S) == GLFW.GLFW_PRESS;
+        boolean left = GLFW.glfwGetKey(window, GLFW.GLFW_KEY_A) == GLFW.GLFW_PRESS;
+        boolean right = GLFW.glfwGetKey(window, GLFW.GLFW_KEY_D) == GLFW.GLFW_PRESS;
+        boolean up = GLFW.glfwGetKey(window, GLFW.GLFW_KEY_SPACE) == GLFW.GLFW_PRESS;
+        boolean down = GLFW.glfwGetKey(window, GLFW.GLFW_KEY_LEFT_SHIFT) == GLFW.GLFW_PRESS;
+
+        GLFW.glfwGetCursorPos(window, cursorPosX, cursorPosY);
+        if (firstMouse) {
+            lastMouseX = cursorPosX[0];
+            lastMouseY = cursorPosY[0];
+            firstMouse = false;
+        }
+        double deltaX = cursorPosX[0] - lastMouseX;
+        double deltaY = cursorPosY[0] - lastMouseY;
+        lastMouseX = cursorPosX[0];
+        lastMouseY = cursorPosY[0];
+
+        return new InputState(forward, backward, left, right, up, down, deltaX, deltaY);
+    }
+
     public boolean shouldClose() {
         return initialized && GLFW.glfwWindowShouldClose(window);
     }
@@ -91,6 +122,7 @@ public final class OpenGLRenderer {
         }
         GLFW.glfwMakeContextCurrent(window);
         GLFW.glfwSwapInterval(1);
+        GLFW.glfwSetInputMode(window, GLFW.GLFW_CURSOR, GLFW.GLFW_CURSOR_DISABLED);
         GLFW.glfwShowWindow(window);
         GL.createCapabilities();
         GL11.glEnable(GL11.GL_DEPTH_TEST);

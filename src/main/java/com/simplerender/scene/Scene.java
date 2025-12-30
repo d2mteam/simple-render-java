@@ -1,6 +1,7 @@
 package com.simplerender.scene;
 
 import com.simplerender.app.EngineConfig;
+import com.simplerender.app.InputState;
 import com.simplerender.app.Time;
 import com.simplerender.camera.Camera;
 import com.simplerender.camera.CameraController;
@@ -34,8 +35,8 @@ public final class Scene {
         return new Scene(camera, cameraController, chunks);
     }
 
-    public void update(Time time) {
-        cameraController.update(camera, time);
+    public void update(Time time, InputState inputState) {
+        cameraController.update(camera, time, inputState);
     }
 
     public SceneSnapshot snapshot() {
