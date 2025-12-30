@@ -40,6 +40,11 @@ public final class Scene {
         RenderableChunk[] chunks = importedModel
             .map(model -> new RenderableChunk[] {createFromImported(meshUploader, model)})
             .orElseGet(() -> createRandomChunks(config, meshUploader));
+        if (importedModel.isPresent()) {
+            logger.info("Scene bootstrapped with imported model");
+        } else {
+            logger.info("Scene bootstrapped with default chunks");
+        }
         logger.info("Scene bootstrapped with {} chunks", chunks.length);
         return new Scene(camera, cameraController, chunks);
     }
