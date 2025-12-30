@@ -68,6 +68,13 @@ final class GpuResourceManager {
         return textures.get(handle);
     }
 
+    public GpuTexture defaultTexture() {
+        return textures.get(defaultTexture);
+    }
+
     record GpuMaterial(float[] baseColor, TextureHandle textureHandle) {
+        TextureHandle baseColorTexture() {
+            return textureHandle;
+        }
     }
 }

@@ -15,6 +15,7 @@ import com.simplerender.render.MaterialHandle;
 import com.simplerender.render.MeshHandle;
 import com.simplerender.render.MeshUploader;
 import com.simplerender.render.RenderItem;
+import com.simplerender.render.Transform;
 import com.simplerender.world.ChunkMeshData;
 import com.simplerender.world.ChunkMeshDataFactory;
 import java.util.Optional;
@@ -40,6 +41,11 @@ public final class Scene {
         RenderableChunk[] chunks = importedModel
             .map(model -> new RenderableChunk[] {createFromImported(meshUploader, model)})
             .orElseGet(() -> createRandomChunks(config, meshUploader));
+        if (importedModel.isPresent()) {
+            logger.info("Scene bootstrapped with imported model");
+        } else {
+            logger.info("Scene bootstrapped with default chunks");
+        }
         logger.info("Scene bootstrapped with {} chunks", chunks.length);
         return new Scene(camera, cameraController, chunks);
     }
@@ -57,6 +63,15 @@ public final class Scene {
         return new SceneSnapshot(camera.snapshot(), snapshots);
     }
 
+    public void updatePrimaryTransform(float x, float y, float z, float scale) {
+        if (chunks.length == 0) {
+            logger.warn("No renderable chunks available to update transform");
+            return;
+        }
+        chunks[0].updateTransform(x, y, z, scale);
+        logger.info("Updated primary object transform to ({}, {}, {}) scale {}", x, y, z, scale);
+    }
+
     private static RenderableChunk[] createRandomChunks(EngineConfig config, MeshUploader meshUploader) {
         TextureData textureData = TextureDataFactory.checkerboard(32, 4);
         ChunkMeshData[] meshData = ChunkMeshDataFactory.randomChunks(config.chunkCount(), config.randomSeed());
@@ -66,7 +81,7 @@ public final class Scene {
             MaterialData material = new MaterialData(new float[] {0.2f, 0.8f, 0.4f}, textureData);
             MeshHandle meshHandle = meshUploader.uploadMesh(mesh);
             MaterialHandle materialHandle = meshUploader.uploadMaterial(material);
-            chunks[i] = new RenderableChunk(new RenderItem(meshHandle, materialHandle));
+            chunks[i] = new RenderableChunk(new RenderItem(meshHandle, materialHandle, new Transform()));
         }
         return chunks;
     }
@@ -74,6 +89,6 @@ public final class Scene {
     private static RenderableChunk createFromImported(MeshUploader meshUploader, ModelImporter.ImportedModel model) {
         MeshHandle meshHandle = meshUploader.uploadMesh(model.meshData());
         MaterialHandle materialHandle = meshUploader.uploadMaterial(model.materialData());
-        return new RenderableChunk(new RenderItem(meshHandle, materialHandle));
+        return new RenderableChunk(new RenderItem(meshHandle, materialHandle, new Transform()));
     }
 }
