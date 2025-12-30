@@ -15,6 +15,7 @@ final class GPUMesh {
     private final IndexBuffer indexBuffer;
     private boolean initialized;
     private int indexCount;
+    private float[] interleaved;
 
     public GPUMesh() {
         this.vertexArray = new VertexArray();
@@ -44,10 +45,15 @@ final class GPUMesh {
         vertexArray.bind();
         vertexBuffer.bind();
         indexBuffer.bind();
-        vertexBuffer.upload(snapshot.positions(), snapshot.positions().length);
+        int required = snapshot.positions().length / 3 * 6;
+        ensureInterleavedCapacity(required);
+        interleave(snapshot.positions(), snapshot.normals(), interleaved);
+        vertexBuffer.upload(interleaved, required);
         indexBuffer.upload(snapshot.indices(), snapshot.indices().length);
         GL20.glEnableVertexAttribArray(0);
-        GL20.glVertexAttribPointer(0, 3, GL11.GL_FLOAT, false, 3 * Float.BYTES, 0);
+        GL20.glVertexAttribPointer(0, 3, GL11.GL_FLOAT, false, 6 * Float.BYTES, 0);
+        GL20.glEnableVertexAttribArray(1);
+        GL20.glVertexAttribPointer(1, 3, GL11.GL_FLOAT, false, 6 * Float.BYTES, 3L * Float.BYTES);
         indexCount = snapshot.indices().length;
         logger.debug("Uploaded mesh with {} vertices and {} indices", vertexCount, indexCount);
     }
@@ -59,5 +65,26 @@ final class GPUMesh {
         }
         vertexArray.bind();
         GL11.glDrawElements(GL11.GL_TRIANGLES, indexCount, GL11.GL_UNSIGNED_INT, 0);
+    }
+
+    private void ensureInterleavedCapacity(int required) {
+        if (interleaved == null || interleaved.length < required) {
+            interleaved = new float[required];
+        }
+    }
+
+    private void interleave(float[] positions, float[] normals, float[] data) {
+        int vertexCount = positions.length / 3;
+        int p = 0;
+        int n = 0;
+        int d = 0;
+        for (int i = 0; i < vertexCount; i++) {
+            data[d++] = positions[p++];
+            data[d++] = positions[p++];
+            data[d++] = positions[p++];
+            data[d++] = normals[n++];
+            data[d++] = normals[n++];
+            data[d++] = normals[n++];
+        }
     }
 }

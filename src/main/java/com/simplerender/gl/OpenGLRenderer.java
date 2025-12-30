@@ -17,7 +17,7 @@ public final class OpenGLRenderer {
     private final RenderPipeline[] pipelines;
     private final GPUMesh[] gpuMeshes;
     private final ShaderProgram shaderProgram;
-    private final float[] projectionMatrix;
+    private RenderUniforms uniforms;
     private boolean initialized;
     private long window;
 
@@ -25,7 +25,6 @@ public final class OpenGLRenderer {
         this.pipelines = new RenderPipeline[chunkCount];
         this.gpuMeshes = new GPUMesh[chunkCount];
         this.shaderProgram = new ShaderProgram();
-        this.projectionMatrix = createOrthoMatrix(0.0f, 20.0f, 0.0f, 20.0f, -1.0f, 1.0f);
         for (int i = 0; i < chunkCount; i++) {
             pipelines[i] = new RenderPipeline(new MeshCache(), new FrustumCuller());
             gpuMeshes[i] = new GPUMesh();
@@ -43,6 +42,10 @@ public final class OpenGLRenderer {
         }
         GL11.glClear(GL11.GL_COLOR_BUFFER_BIT | GL11.GL_DEPTH_BUFFER_BIT);
         shaderProgram.bind();
+        uniforms.updateView(snapshot.camera().position(), snapshot.camera().forward(), snapshot.camera().up());
+        shaderProgram.setUniformMat4("uProjection", uniforms.projectionMatrix());
+        shaderProgram.setUniformMat4("uView", uniforms.viewMatrix());
+        shaderProgram.setUniformVec3("uLightDir", uniforms.lightDirection());
         ChunkMeshData[] chunks = snapshot.chunkMeshData();
         int count = Math.min(chunks.length, gpuMeshes.length);
         for (int i = 0; i < count; i++) {
@@ -92,39 +95,37 @@ public final class OpenGLRenderer {
         GL.createCapabilities();
         GL11.glEnable(GL11.GL_DEPTH_TEST);
         GL11.glClearColor(0.12f, 0.12f, 0.12f, 1.0f);
+        uniforms = new RenderUniforms(800.0f / 600.0f);
         shaderProgram.init(vertexShaderSource(), fragmentShaderSource());
         shaderProgram.bind();
-        shaderProgram.setUniformMat4("uProjection", projectionMatrix);
+        shaderProgram.setUniformMat4("uProjection", uniforms.projectionMatrix());
         initialized = true;
         logger.info("OpenGL context initialized");
-    }
-
-    private float[] createOrthoMatrix(float left, float right, float bottom, float top, float near, float far) {
-        float[] m = new float[16];
-        m[0] = 2.0f / (right - left);
-        m[5] = 2.0f / (top - bottom);
-        m[10] = -2.0f / (far - near);
-        m[12] = -(right + left) / (right - left);
-        m[13] = -(top + bottom) / (top - bottom);
-        m[14] = -(far + near) / (far - near);
-        m[15] = 1.0f;
-        return m;
     }
 
     private String vertexShaderSource() {
         return "#version 330 core\n"
             + "layout(location = 0) in vec3 aPos;\n"
+            + "layout(location = 1) in vec3 aNormal;\n"
             + "uniform mat4 uProjection;\n"
+            + "uniform mat4 uView;\n"
+            + "out vec3 vNormal;\n"
             + "void main() {\n"
-            + "    gl_Position = uProjection * vec4(aPos, 1.0);\n"
+            + "    vNormal = aNormal;\n"
+            + "    gl_Position = uProjection * uView * vec4(aPos, 1.0);\n"
             + "}\n";
     }
 
     private String fragmentShaderSource() {
         return "#version 330 core\n"
+            + "in vec3 vNormal;\n"
+            + "uniform vec3 uLightDir;\n"
             + "out vec4 FragColor;\n"
             + "void main() {\n"
-            + "    FragColor = vec4(0.2, 0.8, 0.4, 1.0);\n"
+            + "    float diff = max(dot(normalize(vNormal), normalize(-uLightDir)), 0.0);\n"
+            + "    vec3 base = vec3(0.2, 0.8, 0.4);\n"
+            + "    vec3 color = base * (0.2 + diff * 0.8);\n"
+            + "    FragColor = vec4(color, 1.0);\n"
             + "}\n";
     }
 }
