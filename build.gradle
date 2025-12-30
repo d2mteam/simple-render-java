@@ -38,7 +38,11 @@ tasks.register('buildPlugins') {
 
 tasks.register('copyPlugins', Copy) {
     dependsOn('buildPlugins')
-    from(project(':plugins:obj-plugin').tasks.named('jar').map { it.archiveFile })
-    from(project(':plugins:gltf-plugin').tasks.named('jar').map { it.archiveFile })
+    from(project(':plugins:obj-plugin').tasks.named('jar').map { it.archiveFile }) {
+        rename { 'obj-plugin.jar' }
+    }
+    from(project(':plugins:gltf-plugin').tasks.named('jar').map { it.archiveFile }) {
+        rename { 'gltf-plugin.jar' }
+    }
     into("${buildDir}/plugins")
 }

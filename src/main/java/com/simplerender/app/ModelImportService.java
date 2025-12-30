@@ -20,8 +20,21 @@ public final class ModelImportService {
     }
 
     public void loadPlugins() {
-        pluginManager.loadPlugins();
-        pluginManager.startPlugins();
+        try {
+            pluginManager.loadPluginsFromClasspath();
+        } catch (Exception e) {
+            logger.warn("Failed to load plugins from classpath", e);
+        }
+        try {
+            pluginManager.loadPlugins();
+        } catch (Exception e) {
+            logger.warn("Failed to load plugins from directory", e);
+        }
+        try {
+            pluginManager.startPlugins();
+        } catch (Exception e) {
+            logger.warn("Failed to start plugins", e);
+        }
         logger.info("Loaded {} plugins", pluginManager.getPlugins().size());
     }
 
