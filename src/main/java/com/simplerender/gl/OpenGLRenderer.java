@@ -14,6 +14,10 @@ import com.simplerender.render.TextureHandle;
 import com.simplerender.render.culling.FrustumCuller;
 import com.simplerender.render.pipeline.RenderPipeline;
 import com.simplerender.scene.SceneSnapshot;
+import java.util.Queue;
+import java.util.concurrent.Callable;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import org.lwjgl.glfw.GLFW;
 import org.lwjgl.opengl.GL;
 import org.lwjgl.opengl.GL11;
@@ -32,6 +36,8 @@ public final class OpenGLRenderer implements MeshUploader {
     private String pendingShaderName;
     private String activeShaderName;
     private long window;
+    private final Queue<Runnable> pendingTasks = new ConcurrentLinkedQueue<>();
+    private Thread renderThread;
 
     public OpenGLRenderer(int chunkCount) {
         this(chunkCount, "default");
@@ -49,6 +55,7 @@ public final class OpenGLRenderer implements MeshUploader {
 
     public void render(SceneSnapshot snapshot) {
         ensureInitialized();
+        drainPendingTasks();
         applyPendingShader();
         if (!pipeline.shouldRender(snapshot.camera())) {
             return;
@@ -120,6 +127,7 @@ public final class OpenGLRenderer implements MeshUploader {
         if (initialized) {
             return;
         }
+        renderThread = Thread.currentThread();
         if (!GLFW.glfwInit()) {
             logger.error("Failed to initialize GLFW");
             throw new IllegalStateException("GLFW init failed");
@@ -179,6 +187,30 @@ public final class OpenGLRenderer implements MeshUploader {
     public long windowHandle() {
         ensureInitialized();
         return window;
+    }
+
+    public <T> CompletableFuture<T> submit(Callable<T> task) {
+        CompletableFuture<T> future = new CompletableFuture<>();
+        Runnable wrapped = () -> {
+            try {
+                future.complete(task.call());
+            } catch (Exception e) {
+                future.completeExceptionally(e);
+            }
+        };
+        if (Thread.currentThread() == renderThread) {
+            wrapped.run();
+        } else {
+            pendingTasks.add(wrapped);
+        }
+        return future;
+    }
+
+    private void drainPendingTasks() {
+        Runnable task;
+        while ((task = pendingTasks.poll()) != null) {
+            task.run();
+        }
     }
 
     private void ensureInitialized() {
