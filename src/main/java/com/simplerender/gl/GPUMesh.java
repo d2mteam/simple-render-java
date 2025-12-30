@@ -2,7 +2,7 @@ package com.simplerender.gl;
 
 import com.simplerender.world.ChunkMeshData;
 
-public final class GPUMesh {
+final class GPUMesh {
     private ChunkMeshData lastUpload;
     private final VertexArray vertexArray;
     private final VertexBuffer vertexBuffer;
