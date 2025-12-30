@@ -1,7 +1,6 @@
 package com.simplerender.app;
 
 import com.simplerender.asset.plugin.ModelImporter;
-import org.pf4j.DevelopmentPluginManager;
 import org.pf4j.PluginManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -17,7 +16,7 @@ public final class ModelImportService {
     private final PluginManager pluginManager;
 
     public ModelImportService(Path pluginsDir) {
-        this.pluginManager = new DevelopmentPluginManager(pluginsDir);
+        this.pluginManager = new SimpleRenderPluginManager(pluginsDir);
     }
 
     public void loadPlugins() {
