@@ -5,10 +5,12 @@ import com.simplerender.math.Vector3f;
 public final class CameraSnapshot {
     private final Vector3f position;
     private final Vector3f forward;
+    private final Vector3f up;
 
-    public CameraSnapshot(Vector3f position, Vector3f forward) {
+    public CameraSnapshot(Vector3f position, Vector3f forward, Vector3f up) {
         this.position = position;
         this.forward = forward;
+        this.up = up;
     }
 
     public Vector3f position() {
@@ -17,5 +19,9 @@ public final class CameraSnapshot {
 
     public Vector3f forward() {
         return forward;
+    }
+
+    public Vector3f up() {
+        return up;
     }
 }

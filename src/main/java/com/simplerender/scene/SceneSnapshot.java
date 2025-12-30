@@ -1,22 +1,22 @@
 package com.simplerender.scene;
 
 import com.simplerender.camera.CameraSnapshot;
-import com.simplerender.world.ChunkMeshData;
+import com.simplerender.render.RenderItem;
 
 public final class SceneSnapshot {
     private final CameraSnapshot camera;
-    private final ChunkMeshData[] chunkMeshData;
+    private final RenderItem[] renderItems;
 
-    public SceneSnapshot(CameraSnapshot camera, ChunkMeshData[] chunkMeshData) {
+    public SceneSnapshot(CameraSnapshot camera, RenderItem[] renderItems) {
         this.camera = camera;
-        this.chunkMeshData = chunkMeshData;
+        this.renderItems = renderItems;
     }
 
     public CameraSnapshot camera() {
         return camera;
     }
 
-    public ChunkMeshData[] chunkMeshData() {
-        return chunkMeshData;
+    public RenderItem[] renderItems() {
+        return renderItems;
     }
 }
