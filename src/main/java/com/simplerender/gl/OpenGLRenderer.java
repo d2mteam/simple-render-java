@@ -2,16 +2,20 @@ package com.simplerender.gl;
 
 import com.simplerender.asset.MaterialData;
 import com.simplerender.asset.MeshData;
+import com.simplerender.asset.TextureData;
+import com.simplerender.asset.TextureDataFactory;
 import com.simplerender.render.MaterialHandle;
 import com.simplerender.render.MeshHandle;
 import com.simplerender.render.MeshUploader;
 import com.simplerender.render.RenderItem;
+import com.simplerender.render.TextureHandle;
 import com.simplerender.render.culling.FrustumCuller;
 import com.simplerender.render.pipeline.RenderPipeline;
 import com.simplerender.scene.SceneSnapshot;
 import org.lwjgl.glfw.GLFW;
 import org.lwjgl.opengl.GL;
 import org.lwjgl.opengl.GL11;
+import org.lwjgl.opengl.GL13;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import com.simplerender.app.InputState;
@@ -61,6 +65,11 @@ public final class OpenGLRenderer implements MeshUploader {
                 continue;
             }
             shaderProgram.setUniformVec3("uBaseColor", material.baseColor());
+            GpuTexture texture = resourceManager.texture(material.textureHandle());
+            if (texture != null) {
+                GL13.glActiveTexture(GL13.GL_TEXTURE0);
+                GL11.glBindTexture(GL11.GL_TEXTURE_2D, texture.id());
+            }
             mesh.draw();
         }
         GLFW.glfwSwapBuffers(window);
@@ -119,6 +128,14 @@ public final class OpenGLRenderer implements MeshUploader {
         return resourceManager.uploadMaterial(materialData);
     }
 
+    @Override
+    public TextureHandle uploadTexture(TextureData textureData) {
+        if (!initialized) {
+            initWindow();
+        }
+        return resourceManager.uploadTexture(textureData);
+    }
+
     private void initWindow() {
         if (!GLFW.glfwInit()) {
             logger.error("Failed to initialize GLFW");
@@ -139,9 +156,11 @@ public final class OpenGLRenderer implements MeshUploader {
         GL11.glEnable(GL11.GL_DEPTH_TEST);
         GL11.glClearColor(0.12f, 0.12f, 0.12f, 1.0f);
         uniforms = new RenderUniforms(800.0f / 600.0f);
+        resourceManager.initDefaultTexture(TextureDataFactory.checkerboard(2, 1));
         shaderProgram.init(vertexShaderSource(), fragmentShaderSource());
         shaderProgram.bind();
         shaderProgram.setUniformMat4("uProjection", uniforms.projectionMatrix());
+        shaderProgram.setUniformInt("uTexture", 0);
         initialized = true;
         logger.info("OpenGL context initialized");
     }
@@ -164,10 +183,12 @@ public final class OpenGLRenderer implements MeshUploader {
             + "in vec3 vNormal;\n"
             + "uniform vec3 uLightDir;\n"
             + "uniform vec3 uBaseColor;\n"
+            + "uniform sampler2D uTexture;\n"
             + "out vec4 FragColor;\n"
             + "void main() {\n"
             + "    float diff = max(dot(normalize(vNormal), normalize(-uLightDir)), 0.0);\n"
-            + "    vec3 color = uBaseColor * (0.2 + diff * 0.8);\n"
+            + "    vec3 base = uBaseColor * texture(uTexture, vec2(0.5, 0.5)).rgb;\n"
+            + "    vec3 color = base * (0.2 + diff * 0.8);\n"
             + "    FragColor = vec4(color, 1.0);\n"
             + "}\n";
     }

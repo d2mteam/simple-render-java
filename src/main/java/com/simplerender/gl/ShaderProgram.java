@@ -58,6 +58,15 @@ final class ShaderProgram {
         GL20.glUniform3f(location, vec3[0], vec3[1], vec3[2]);
     }
 
+    public void setUniformInt(String name, int value) {
+        int location = GL20.glGetUniformLocation(programId, name);
+        if (location < 0) {
+            logger.error("Uniform {} not found", name);
+            return;
+        }
+        GL20.glUniform1i(location, value);
+    }
+
     public boolean isInitialized() {
         return initialized;
     }

@@ -6,6 +6,8 @@ import com.simplerender.app.Time;
 import com.simplerender.asset.MaterialData;
 import com.simplerender.asset.MeshData;
 import com.simplerender.asset.MeshDataFactory;
+import com.simplerender.asset.TextureData;
+import com.simplerender.asset.TextureDataFactory;
 import com.simplerender.camera.Camera;
 import com.simplerender.camera.CameraController;
 import com.simplerender.render.MaterialHandle;
@@ -33,11 +35,12 @@ public final class Scene {
     public static Scene bootstrap(EngineConfig config, MeshUploader meshUploader) {
         Camera camera = new Camera();
         CameraController cameraController = new CameraController();
+        TextureData textureData = TextureDataFactory.checkerboard(32, 4);
         ChunkMeshData[] meshData = ChunkMeshDataFactory.randomChunks(config.chunkCount(), config.randomSeed());
         RenderableChunk[] chunks = new RenderableChunk[meshData.length];
         for (int i = 0; i < meshData.length; i++) {
             MeshData mesh = MeshDataFactory.fromChunkMeshData(meshData[i]);
-            MaterialData material = new MaterialData(new float[] {0.2f, 0.8f, 0.4f});
+            MaterialData material = new MaterialData(new float[] {0.2f, 0.8f, 0.4f}, textureData);
             MeshHandle meshHandle = meshUploader.uploadMesh(mesh);
             MaterialHandle materialHandle = meshUploader.uploadMaterial(material);
             chunks[i] = new RenderableChunk(new RenderItem(meshHandle, materialHandle));
