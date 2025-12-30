@@ -8,6 +8,7 @@ import com.simplerender.asset.MeshData;
 import com.simplerender.asset.MeshDataFactory;
 import com.simplerender.asset.TextureData;
 import com.simplerender.asset.TextureDataFactory;
+import com.simplerender.asset.plugin.ModelImporter;
 import com.simplerender.camera.Camera;
 import com.simplerender.camera.CameraController;
 import com.simplerender.render.MaterialHandle;
@@ -16,6 +17,7 @@ import com.simplerender.render.MeshUploader;
 import com.simplerender.render.RenderItem;
 import com.simplerender.world.ChunkMeshData;
 import com.simplerender.world.ChunkMeshDataFactory;
+import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -32,19 +34,12 @@ public final class Scene {
         this.chunks = chunks;
     }
 
-    public static Scene bootstrap(EngineConfig config, MeshUploader meshUploader) {
+    public static Scene bootstrap(EngineConfig config, MeshUploader meshUploader, Optional<ModelImporter.ImportedModel> importedModel) {
         Camera camera = new Camera();
         CameraController cameraController = new CameraController();
-        TextureData textureData = TextureDataFactory.checkerboard(32, 4);
-        ChunkMeshData[] meshData = ChunkMeshDataFactory.randomChunks(config.chunkCount(), config.randomSeed());
-        RenderableChunk[] chunks = new RenderableChunk[meshData.length];
-        for (int i = 0; i < meshData.length; i++) {
-            MeshData mesh = MeshDataFactory.fromChunkMeshData(meshData[i]);
-            MaterialData material = new MaterialData(new float[] {0.2f, 0.8f, 0.4f}, textureData);
-            MeshHandle meshHandle = meshUploader.uploadMesh(mesh);
-            MaterialHandle materialHandle = meshUploader.uploadMaterial(material);
-            chunks[i] = new RenderableChunk(new RenderItem(meshHandle, materialHandle));
-        }
+        RenderableChunk[] chunks = importedModel
+            .map(model -> new RenderableChunk[] {createFromImported(meshUploader, model)})
+            .orElseGet(() -> createRandomChunks(config, meshUploader));
         logger.info("Scene bootstrapped with {} chunks", chunks.length);
         return new Scene(camera, cameraController, chunks);
     }
@@ -60,5 +55,25 @@ public final class Scene {
         }
         logger.debug("Scene snapshot created for {} chunks", snapshots.length);
         return new SceneSnapshot(camera.snapshot(), snapshots);
+    }
+
+    private static RenderableChunk[] createRandomChunks(EngineConfig config, MeshUploader meshUploader) {
+        TextureData textureData = TextureDataFactory.checkerboard(32, 4);
+        ChunkMeshData[] meshData = ChunkMeshDataFactory.randomChunks(config.chunkCount(), config.randomSeed());
+        RenderableChunk[] chunks = new RenderableChunk[meshData.length];
+        for (int i = 0; i < meshData.length; i++) {
+            MeshData mesh = MeshDataFactory.fromChunkMeshData(meshData[i]);
+            MaterialData material = new MaterialData(new float[] {0.2f, 0.8f, 0.4f}, textureData);
+            MeshHandle meshHandle = meshUploader.uploadMesh(mesh);
+            MaterialHandle materialHandle = meshUploader.uploadMaterial(material);
+            chunks[i] = new RenderableChunk(new RenderItem(meshHandle, materialHandle));
+        }
+        return chunks;
+    }
+
+    private static RenderableChunk createFromImported(MeshUploader meshUploader, ModelImporter.ImportedModel model) {
+        MeshHandle meshHandle = meshUploader.uploadMesh(model.meshData());
+        MaterialHandle materialHandle = meshUploader.uploadMaterial(model.materialData());
+        return new RenderableChunk(new RenderItem(meshHandle, materialHandle));
     }
 }

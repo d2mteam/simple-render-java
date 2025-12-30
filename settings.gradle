@@ -1,1 +1,3 @@
 rootProject.name = 'simple-render'
+include 'plugins:obj-plugin'
+include 'plugins:gltf-plugin'

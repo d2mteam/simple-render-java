@@ -1,0 +1,27 @@
+plugins {
+    id 'java'
+}
+
+group = 'com.simplerender'
+version = '1.0.0'
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    implementation 'org.pf4j:pf4j:3.12.0'
+    implementation 'com.google.code.gson:gson:2.11.0'
+    implementation project(':')
+}
+
+jar {
+    manifest {
+        attributes(
+            'Plugin-Id': 'gltf-importer',
+            'Plugin-Class': 'com.simplerender.plugin.gltf.GltfImporterPlugin',
+            'Plugin-Version': project.version,
+            'Plugin-Provider': 'simple-render'
+        )
+    }
+}
