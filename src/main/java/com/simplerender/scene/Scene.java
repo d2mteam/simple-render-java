@@ -44,6 +44,10 @@ public final class Scene {
         return new Scene(camera, cameraController, chunks);
     }
 
+    public void update(Time time) {
+        update(time, InputState.idle());
+    }
+
     public void update(Time time, InputState inputState) {
         cameraController.update(camera, time, inputState);
     }
