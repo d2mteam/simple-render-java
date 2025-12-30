@@ -46,3 +46,7 @@ tasks.register('copyPlugins', Copy) {
     }
     into("${buildDir}/plugins")
 }
+
+tasks.withType(JavaExec).configureEach {
+    dependsOn(':plugins:obj-plugin:classes', ':plugins:gltf-plugin:classes')
+}
