@@ -39,7 +39,13 @@ public final class OpenGLRenderer implements MeshUploader {
     private final double[] cursorPosX = new double[1];
     private final double[] cursorPosY = new double[1];
 
+    private final String shaderName;
+
     public OpenGLRenderer(int chunkCount) {
+        this(chunkCount, "default");
+    }
+
+    public OpenGLRenderer(int chunkCount, String shaderName) {
         this.pipeline = new RenderPipeline(new FrustumCuller());
         this.shaderProgram = new ShaderProgram();
         this.resourceManager = new GpuResourceManager();
