@@ -25,6 +25,7 @@ public final class ModelImportService {
     }
 
     public void loadPlugins() {
+        logger.info("Loading plugins from {}", pluginManager.getPluginsRoot());
         try {
             pluginManager.loadPlugins();
         } catch (Exception e) {
@@ -36,17 +37,45 @@ public final class ModelImportService {
             logger.warn("Failed to start plugins", e);
         }
         logger.info("Loaded {} plugins", pluginManager.getPlugins().size());
+        pluginManager.getPlugins().forEach(plugin -> logger.info(
+            "Plugin loaded: {} ({})",
+            plugin.getDescriptor().getPluginId(),
+            plugin.getPluginPath()
+        ));
+        List<ModelImporter> importers = pluginManager.getExtensions(ModelImporter.class);
+        if (importers.isEmpty()) {
+            logger.warn("No model importers found. Ensure plugin jars or classes are built.");
+        } else {
+            for (ModelImporter importer : importers) {
+                logger.info("Model importer available: {} supports {}",
+                    importer.getClass().getSimpleName(),
+                    String.join(", ", importer.supportedExtensions())
+                );
+            }
+        }
     }
 
     public Optional<ModelImporter.ImportedModel> importModel(Path path) {
         String extension = extension(path);
+        logger.info("Attempting to import model {} (extension: {})", path, extension);
         List<ModelImporter> importers = pluginManager.getExtensions(ModelImporter.class);
         for (ModelImporter importer : importers) {
             if (importerSupports(importer, extension)) {
+                logger.info("Using importer {} for {}", importer.getClass().getSimpleName(), path);
                 return Optional.of(importer.importModel(path));
             }
         }
-        logger.error("No importer found for extension {}", extension);
+        if (importers.isEmpty()) {
+            logger.error("No importers registered. Plugins may not be loaded correctly.");
+        } else {
+            String supported = importers.stream()
+                .flatMap(importer -> Stream.of(importer.supportedExtensions()))
+                .distinct()
+                .sorted()
+                .reduce((left, right) -> left + ", " + right)
+                .orElse("none");
+            logger.error("No importer found for extension {}. Supported: {}", extension, supported);
+        }
         return Optional.empty();
     }
 
