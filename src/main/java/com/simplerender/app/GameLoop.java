@@ -22,13 +22,15 @@ public final class GameLoop {
 
     public void run() {
         int frame = 0;
-        if (config.maxFrames() <= 0) {
-            logger.error("Max frames must be positive, got {}", config.maxFrames());
-            return;
+        boolean limitFrames = config.maxFrames() > 0;
+        if (!limitFrames) {
+            logger.info("Game loop starting with continuous run");
+        } else {
+            logger.info("Game loop starting with maxFrames={}", config.maxFrames());
         }
-        logger.info("Game loop starting with maxFrames={}", config.maxFrames());
-        while (frame < config.maxFrames()) {
+        while (!renderer.shouldClose() && (!limitFrames || frame < config.maxFrames())) {
             time.update();
+            renderer.pollEvents();
             scene.update(time);
             renderer.render(scene.snapshot());
             logger.debug("Completed frame {}", frame);

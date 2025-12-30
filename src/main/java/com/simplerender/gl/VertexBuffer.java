@@ -1,17 +1,37 @@
 package com.simplerender.gl;
 
-final class VertexBuffer {
-    private float[] positions;
-    private float[] normals;
-    private int vertexCount;
+import org.lwjgl.BufferUtils;
+import org.lwjgl.opengl.GL15;
 
-    public void upload(float[] positions, float[] normals, int vertexCount) {
-        this.positions = positions;
-        this.normals = normals;
-        this.vertexCount = vertexCount;
+import java.nio.FloatBuffer;
+
+final class VertexBuffer {
+    private int bufferId;
+    private int capacityFloats;
+    private FloatBuffer floatBuffer;
+
+    public void init() {
+        bufferId = GL15.glGenBuffers();
     }
 
-    public int vertexCount() {
-        return vertexCount;
+    public void bind() {
+        GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, bufferId);
+    }
+
+    public void ensureCapacity(int floatCount) {
+        if (floatCount <= capacityFloats) {
+            return;
+        }
+        capacityFloats = floatCount;
+        floatBuffer = BufferUtils.createFloatBuffer(capacityFloats);
+        GL15.glBufferData(GL15.GL_ARRAY_BUFFER, (long) capacityFloats * Float.BYTES, GL15.GL_DYNAMIC_DRAW);
+    }
+
+    public void upload(float[] data, int floatCount) {
+        bind();
+        ensureCapacity(floatCount);
+        floatBuffer.clear();
+        floatBuffer.put(data, 0, floatCount).flip();
+        GL15.glBufferSubData(GL15.GL_ARRAY_BUFFER, 0, floatBuffer);
     }
 }

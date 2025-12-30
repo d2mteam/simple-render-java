@@ -1,13 +1,19 @@
 package com.simplerender.gl;
 
-final class VertexArray {
-    private boolean bound;
+import org.lwjgl.opengl.GL30;
 
-    public void bind() {
-        bound = true;
+final class VertexArray {
+    private int vaoId;
+
+    public void init() {
+        vaoId = GL30.glGenVertexArrays();
     }
 
-    public boolean isBound() {
-        return bound;
+    public void bind() {
+        GL30.glBindVertexArray(vaoId);
+    }
+
+    public int id() {
+        return vaoId;
     }
 }
