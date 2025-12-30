@@ -33,8 +33,6 @@ public final class OpenGLRenderer implements MeshUploader {
     private String activeShaderName;
     private long window;
 
-    private final String shaderName;
-
     public OpenGLRenderer(int chunkCount) {
         this(chunkCount, "default");
     }
@@ -47,14 +45,6 @@ public final class OpenGLRenderer implements MeshUploader {
         this.pendingShaderName = resolved;
         this.activeShaderName = resolved;
         logger.info("Renderer initialized with {} GPU mesh slots", chunkCount);
-    }
-
-    public OpenGLRenderer(int chunkCount, String shaderName) {
-        this(chunkCount);
-        if (shaderName != null && !shaderName.isBlank()) {
-            this.pendingShaderName = shaderName;
-            this.activeShaderName = shaderName;
-        }
     }
 
     public void render(SceneSnapshot snapshot) {
@@ -164,6 +154,7 @@ public final class OpenGLRenderer implements MeshUploader {
         if (pendingShaderName.equals(activeShaderName)) {
             return;
         }
+        logger.info("Switching shader from {} to {}", activeShaderName, pendingShaderName);
         ShaderSource shaderSource = ShaderSourceLoader.loadByName(pendingShaderName);
         shaderProgram.dispose();
         shaderProgram.init(shaderSource.vertexSource(), shaderSource.fragmentSource());
