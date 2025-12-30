@@ -11,6 +11,8 @@ repositories {
 
 def lwjglVersion = "3.3.3"
 def lwjglNatives = "natives-linux"
+def javafxVersion = "21.0.2"
+def javafxPlatform = "linux"
 
 dependencies {
     implementation platform("org.lwjgl:lwjgl-bom:$lwjglVersion")
@@ -23,6 +25,10 @@ dependencies {
     implementation 'org.slf4j:slf4j-api:2.0.13'
     runtimeOnly 'org.slf4j:slf4j-simple:2.0.13'
     implementation 'org.pf4j:pf4j:3.12.0'
+    implementation "org.openjfx:javafx-base:${javafxVersion}:${javafxPlatform}"
+    implementation "org.openjfx:javafx-graphics:${javafxVersion}:${javafxPlatform}"
+    implementation "org.openjfx:javafx-controls:${javafxVersion}:${javafxPlatform}"
+    implementation 'com.google.code.gson:gson:2.11.0'
     testImplementation platform('org.junit:junit-bom:5.10.0')
     testImplementation 'org.junit.jupiter:junit-jupiter'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'

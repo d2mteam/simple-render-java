@@ -2,6 +2,8 @@ package com.simplerender.gl;
 
 import com.simplerender.asset.MaterialData;
 import com.simplerender.asset.MeshData;
+import com.simplerender.asset.ShaderSource;
+import com.simplerender.asset.ShaderSourceLoader;
 import com.simplerender.asset.TextureData;
 import com.simplerender.asset.TextureDataFactory;
 import com.simplerender.render.MaterialHandle;
@@ -28,6 +30,8 @@ public final class OpenGLRenderer implements MeshUploader {
     private final GpuResourceManager resourceManager;
     private RenderUniforms uniforms;
     private boolean initialized;
+    private volatile String pendingShaderName;
+    private String activeShaderName;
     private long window;
     private double lastMouseX;
     private double lastMouseY;
@@ -39,6 +43,8 @@ public final class OpenGLRenderer implements MeshUploader {
         this.pipeline = new RenderPipeline(new FrustumCuller());
         this.shaderProgram = new ShaderProgram();
         this.resourceManager = new GpuResourceManager();
+        this.pendingShaderName = "default";
+        this.activeShaderName = "default";
         logger.info("Renderer initialized with {} GPU mesh slots", chunkCount);
     }
 
@@ -46,6 +52,7 @@ public final class OpenGLRenderer implements MeshUploader {
         if (!initialized) {
             initWindow();
         }
+        applyPendingShader();
         if (!pipeline.shouldRender(snapshot.camera())) {
             return;
         }
@@ -64,12 +71,10 @@ public final class OpenGLRenderer implements MeshUploader {
                 logger.error("Missing GPU resources for render item {}", i);
                 continue;
             }
+            shaderProgram.setUniformMat4("uModel", item.transform().matrix());
             shaderProgram.setUniformVec3("uBaseColor", material.baseColor());
-            GpuTexture texture = resourceManager.texture(material.textureHandle());
-            if (texture != null) {
-                GL13.glActiveTexture(GL13.GL_TEXTURE0);
-                GL11.glBindTexture(GL11.GL_TEXTURE_2D, texture.id());
-            }
+            GpuTexture texture = resourceManager.texture(material.baseColorTexture());
+            bindTextureUnit(GL13.GL_TEXTURE0, texture);
             mesh.draw();
         }
         GLFW.glfwSwapBuffers(window);
@@ -110,6 +115,13 @@ public final class OpenGLRenderer implements MeshUploader {
 
     public boolean shouldClose() {
         return initialized && GLFW.glfwWindowShouldClose(window);
+    }
+
+    public void requestShader(String shaderName) {
+        if (shaderName == null || shaderName.isBlank()) {
+            return;
+        }
+        pendingShaderName = shaderName;
     }
 
     @Override
@@ -157,39 +169,37 @@ public final class OpenGLRenderer implements MeshUploader {
         GL11.glClearColor(0.12f, 0.12f, 0.12f, 1.0f);
         uniforms = new RenderUniforms(800.0f / 600.0f);
         resourceManager.initDefaultTexture(TextureDataFactory.checkerboard(2, 1));
-        shaderProgram.init(vertexShaderSource(), fragmentShaderSource());
+        ShaderSource shaderSource = ShaderSourceLoader.loadByName(pendingShaderName);
+        shaderProgram.init(shaderSource.vertexSource(), shaderSource.fragmentSource());
         shaderProgram.bind();
         shaderProgram.setUniformMat4("uProjection", uniforms.projectionMatrix());
         shaderProgram.setUniformInt("uTexture", 0);
+        activeShaderName = pendingShaderName;
         initialized = true;
         logger.info("OpenGL context initialized");
     }
 
-    private String vertexShaderSource() {
-        return "#version 330 core\n"
-            + "layout(location = 0) in vec3 aPos;\n"
-            + "layout(location = 1) in vec3 aNormal;\n"
-            + "uniform mat4 uProjection;\n"
-            + "uniform mat4 uView;\n"
-            + "out vec3 vNormal;\n"
-            + "void main() {\n"
-            + "    vNormal = aNormal;\n"
-            + "    gl_Position = uProjection * uView * vec4(aPos, 1.0);\n"
-            + "}\n";
+    private void applyPendingShader() {
+        if (!shaderProgram.isInitialized()) {
+            return;
+        }
+        if (pendingShaderName.equals(activeShaderName)) {
+            return;
+        }
+        ShaderSource shaderSource = ShaderSourceLoader.loadByName(pendingShaderName);
+        shaderProgram.dispose();
+        shaderProgram.init(shaderSource.vertexSource(), shaderSource.fragmentSource());
+        shaderProgram.bind();
+        shaderProgram.setUniformMat4("uProjection", uniforms.projectionMatrix());
+        shaderProgram.setUniformInt("uTexture", 0);
+        activeShaderName = pendingShaderName;
     }
 
-    private String fragmentShaderSource() {
-        return "#version 330 core\n"
-            + "in vec3 vNormal;\n"
-            + "uniform vec3 uLightDir;\n"
-            + "uniform vec3 uBaseColor;\n"
-            + "uniform sampler2D uTexture;\n"
-            + "out vec4 FragColor;\n"
-            + "void main() {\n"
-            + "    float diff = max(dot(normalize(vNormal), normalize(-uLightDir)), 0.0);\n"
-            + "    vec3 base = uBaseColor * texture(uTexture, vec2(0.5, 0.5)).rgb;\n"
-            + "    vec3 color = base * (0.2 + diff * 0.8);\n"
-            + "    FragColor = vec4(color, 1.0);\n"
-            + "}\n";
+    private void bindTextureUnit(int textureUnit, GpuTexture texture) {
+        if (texture == null) {
+            return;
+        }
+        GL13.glActiveTexture(textureUnit);
+        GL11.glBindTexture(GL11.GL_TEXTURE_2D, texture.id());
     }
 }

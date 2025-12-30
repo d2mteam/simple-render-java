@@ -69,5 +69,8 @@ final class GpuResourceManager {
     }
 
     record GpuMaterial(float[] baseColor, TextureHandle textureHandle) {
+        TextureHandle baseColorTexture() {
+            return textureHandle;
+        }
     }
 }
