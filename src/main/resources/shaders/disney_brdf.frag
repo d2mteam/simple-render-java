@@ -2,7 +2,11 @@
 in vec3 vNormal;
 uniform vec3 uLightDir;
 uniform vec3 uBaseColor;
-uniform sampler2D uTexture;
+uniform sampler2D uBaseColorTexture;
+uniform sampler2D uNormalTexture;
+uniform sampler2D uMetallicRoughnessTexture;
+uniform sampler2D uAoTexture;
+uniform sampler2D uEmissiveTexture;
 out vec4 FragColor;
 
 float schlickWeight(float cosTheta) {
@@ -27,7 +31,7 @@ void main() {
     float viewScatter = mix(1.0, fd90, schlickWeight(ndotv));
     float disneyDiffuse = lightScatter * viewScatter;
 
-    vec3 base = uBaseColor * texture(uTexture, vec2(0.5, 0.5)).rgb;
+    vec3 base = uBaseColor * texture(uBaseColorTexture, vec2(0.5, 0.5)).rgb;
     vec3 color = base * (0.2 + disneyDiffuse * ndotl * 0.8);
     FragColor = vec4(color, 1.0);
 }

@@ -74,11 +74,11 @@ public final class OpenGLRenderer implements MeshUploader {
                 continue;
             }
             shaderProgram.setUniformVec3("uBaseColor", material.baseColor());
-            GpuTexture texture = resourceManager.texture(material.textureHandle());
-            if (texture != null) {
-                GL13.glActiveTexture(GL13.GL_TEXTURE0);
-                GL11.glBindTexture(GL11.GL_TEXTURE_2D, texture.id());
-            }
+            bindTextureUnit(GL13.GL_TEXTURE0, material.baseColorTexture());
+            bindTextureUnit(GL13.GL_TEXTURE1, material.normalTexture());
+            bindTextureUnit(GL13.GL_TEXTURE2, material.metallicRoughnessTexture());
+            bindTextureUnit(GL13.GL_TEXTURE3, material.aoTexture());
+            bindTextureUnit(GL13.GL_TEXTURE4, material.emissiveTexture());
             mesh.draw();
         }
         GLFW.glfwSwapBuffers(window);
@@ -170,8 +170,21 @@ public final class OpenGLRenderer implements MeshUploader {
         shaderProgram.init(shaderSource.vertexSource(), shaderSource.fragmentSource());
         shaderProgram.bind();
         shaderProgram.setUniformMat4("uProjection", uniforms.projectionMatrix());
-        shaderProgram.setUniformInt("uTexture", 0);
+        shaderProgram.setUniformInt("uBaseColorTexture", 0);
+        shaderProgram.setUniformInt("uNormalTexture", 1);
+        shaderProgram.setUniformInt("uMetallicRoughnessTexture", 2);
+        shaderProgram.setUniformInt("uAoTexture", 3);
+        shaderProgram.setUniformInt("uEmissiveTexture", 4);
         initialized = true;
         logger.info("OpenGL context initialized");
+    }
+
+    private void bindTextureUnit(int unit, TextureHandle handle) {
+        GpuTexture texture = resourceManager.texture(handle);
+        if (texture == null) {
+            return;
+        }
+        GL13.glActiveTexture(unit);
+        GL11.glBindTexture(GL11.GL_TEXTURE_2D, texture.id());
     }
 }
