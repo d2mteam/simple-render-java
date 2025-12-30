@@ -1,12 +1,20 @@
 package com.simplerender.world;
 
 import java.util.Random;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public final class ChunkMeshDataFactory {
+    private static final Logger logger = LoggerFactory.getLogger(ChunkMeshDataFactory.class);
+
     private ChunkMeshDataFactory() {
     }
 
     public static ChunkMeshData[] randomChunks(int count, long seed) {
+        if (count <= 0) {
+            logger.error("Chunk count must be positive, got {}", count);
+            return new ChunkMeshData[0];
+        }
         Random random = new Random(seed);
         ChunkMeshData[] chunks = new ChunkMeshData[count];
         for (int i = 0; i < count; i++) {
@@ -15,6 +23,7 @@ public final class ChunkMeshDataFactory {
             float baseZ = random.nextInt(8) * 2.0f;
             chunks[i] = createQuadChunk(baseX, baseY, baseZ);
         }
+        logger.info("Generated {} random chunk mesh snapshots with seed {}", count, seed);
         return chunks;
     }
 

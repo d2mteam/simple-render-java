@@ -1,7 +1,13 @@
 package com.simplerender.gl;
 
 final class ShaderProgram {
+    private boolean bound;
+
     public void bind() {
-        // Placeholder for GL shader binding.
+        bound = true;
+    }
+
+    public boolean isBound() {
+        return bound;
     }
 }

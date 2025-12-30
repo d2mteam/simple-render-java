@@ -13,6 +13,10 @@ public final class ChunkBlockView {
         return size;
     }
 
+    public int blockCount() {
+        return blocks.length;
+    }
+
     public byte blockAt(int index) {
         return blocks[index];
     }

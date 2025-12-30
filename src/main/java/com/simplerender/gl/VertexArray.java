@@ -1,7 +1,13 @@
 package com.simplerender.gl;
 
 final class VertexArray {
+    private boolean bound;
+
     public void bind() {
-        // Placeholder for VAO binding.
+        bound = true;
+    }
+
+    public boolean isBound() {
+        return bound;
     }
 }

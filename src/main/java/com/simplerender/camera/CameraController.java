@@ -4,7 +4,7 @@ import com.simplerender.app.Time;
 
 public final class CameraController {
     public void update(Camera camera, Time time) {
-        // Placeholder for input-driven camera updates.
-        camera.position().setZ(camera.position().z() + 0.0f * time.deltaSeconds());
+        float drift = 0.1f * time.deltaSeconds();
+        camera.position().setZ(camera.position().z() + drift);
     }
 }
