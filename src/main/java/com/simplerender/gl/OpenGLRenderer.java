@@ -2,6 +2,8 @@ package com.simplerender.gl;
 
 import com.simplerender.asset.MaterialData;
 import com.simplerender.asset.MeshData;
+import com.simplerender.asset.ShaderSource;
+import com.simplerender.asset.ShaderSourceLoader;
 import com.simplerender.asset.TextureData;
 import com.simplerender.asset.TextureDataFactory;
 import com.simplerender.render.MaterialHandle;
@@ -35,10 +37,17 @@ public final class OpenGLRenderer implements MeshUploader {
     private final double[] cursorPosX = new double[1];
     private final double[] cursorPosY = new double[1];
 
+    private final String shaderName;
+
     public OpenGLRenderer(int chunkCount) {
+        this(chunkCount, "default");
+    }
+
+    public OpenGLRenderer(int chunkCount, String shaderName) {
         this.pipeline = new RenderPipeline(new FrustumCuller());
         this.shaderProgram = new ShaderProgram();
         this.resourceManager = new GpuResourceManager();
+        this.shaderName = shaderName;
         logger.info("Renderer initialized with {} GPU mesh slots", chunkCount);
     }
 
@@ -157,39 +166,12 @@ public final class OpenGLRenderer implements MeshUploader {
         GL11.glClearColor(0.12f, 0.12f, 0.12f, 1.0f);
         uniforms = new RenderUniforms(800.0f / 600.0f);
         resourceManager.initDefaultTexture(TextureDataFactory.checkerboard(2, 1));
-        shaderProgram.init(vertexShaderSource(), fragmentShaderSource());
+        ShaderSource shaderSource = ShaderSourceLoader.loadByName(shaderName);
+        shaderProgram.init(shaderSource.vertexSource(), shaderSource.fragmentSource());
         shaderProgram.bind();
         shaderProgram.setUniformMat4("uProjection", uniforms.projectionMatrix());
         shaderProgram.setUniformInt("uTexture", 0);
         initialized = true;
         logger.info("OpenGL context initialized");
-    }
-
-    private String vertexShaderSource() {
-        return "#version 330 core\n"
-            + "layout(location = 0) in vec3 aPos;\n"
-            + "layout(location = 1) in vec3 aNormal;\n"
-            + "uniform mat4 uProjection;\n"
-            + "uniform mat4 uView;\n"
-            + "out vec3 vNormal;\n"
-            + "void main() {\n"
-            + "    vNormal = aNormal;\n"
-            + "    gl_Position = uProjection * uView * vec4(aPos, 1.0);\n"
-            + "}\n";
-    }
-
-    private String fragmentShaderSource() {
-        return "#version 330 core\n"
-            + "in vec3 vNormal;\n"
-            + "uniform vec3 uLightDir;\n"
-            + "uniform vec3 uBaseColor;\n"
-            + "uniform sampler2D uTexture;\n"
-            + "out vec4 FragColor;\n"
-            + "void main() {\n"
-            + "    float diff = max(dot(normalize(vNormal), normalize(-uLightDir)), 0.0);\n"
-            + "    vec3 base = uBaseColor * texture(uTexture, vec2(0.5, 0.5)).rgb;\n"
-            + "    vec3 color = base * (0.2 + diff * 0.8);\n"
-            + "    FragColor = vec4(color, 1.0);\n"
-            + "}\n";
     }
 }

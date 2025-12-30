@@ -8,6 +8,8 @@ import com.simplerender.asset.MeshData;
 import com.simplerender.asset.TextureData;
 import com.simplerender.asset.plugin.ModelImporter;
 import org.pf4j.Extension;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
@@ -21,6 +23,8 @@ import java.util.Base64;
 
 @Extension
 public final class GltfModelImporter implements ModelImporter {
+    private static final Logger logger = LoggerFactory.getLogger(GltfModelImporter.class);
+
     @Override
     public String[] supportedExtensions() {
         return new String[] {"gltf", "glb"};

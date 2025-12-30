@@ -19,7 +19,7 @@ public final class GameApplication {
 
     public GameApplication(EngineConfig config) {
         this.config = config;
-        this.renderer = new OpenGLRenderer(config.chunkCount());
+        this.renderer = new OpenGLRenderer(config.chunkCount(), config.shaderName());
         ModelImportService importService = ModelImportService.defaultService();
         importService.loadPlugins();
         Optional<Path> modelPath = ModelFileDialog.chooseModelFile();
