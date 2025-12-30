@@ -7,8 +7,13 @@ import org.slf4j.LoggerFactory;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.Files;
+import java.nio.file.StandardCopyOption;
+import java.io.IOException;
 import java.util.List;
 import java.util.Optional;
+import java.util.ArrayList;
+import java.util.stream.Stream;
 
 public final class ModelImportService {
     private static final Logger logger = LoggerFactory.getLogger(ModelImportService.class);
@@ -68,6 +73,24 @@ public final class ModelImportService {
         if (buildPlugins.toFile().exists()) {
             return new ModelImportService(buildPlugins);
         }
-        return new ModelImportService(Paths.get("plugins"));
+        Path devPlugins = Paths.get("plugins");
+        Path devBuildLibs = Paths.get("plugins").toAbsolutePath();
+        try (Stream<Path> libs = Files.exists(devBuildLibs) ? Files.walk(devBuildLibs, 3) : Stream.empty()) {
+            List<Path> jars = new ArrayList<>();
+            libs.filter(path -> path.toString().endsWith(".jar"))
+                .filter(path -> path.toString().contains("build/libs"))
+                .forEach(jars::add);
+            if (!jars.isEmpty()) {
+                Files.createDirectories(buildPlugins);
+                for (Path jar : jars) {
+                    Path target = buildPlugins.resolve(jar.getFileName().toString());
+                    Files.copy(jar, target, StandardCopyOption.REPLACE_EXISTING);
+                }
+                return new ModelImportService(buildPlugins);
+            }
+        } catch (IOException e) {
+            logger.warn("Failed to prepare plugin jars", e);
+        }
+        return new ModelImportService(devPlugins);
     }
 }
