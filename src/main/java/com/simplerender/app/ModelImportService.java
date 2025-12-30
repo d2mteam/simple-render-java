@@ -21,11 +21,6 @@ public final class ModelImportService {
 
     public void loadPlugins() {
         try {
-            pluginManager.loadPluginsFromClasspath();
-        } catch (Exception e) {
-            logger.warn("Failed to load plugins from classpath", e);
-        }
-        try {
             pluginManager.loadPlugins();
         } catch (Exception e) {
             logger.warn("Failed to load plugins from directory", e);
