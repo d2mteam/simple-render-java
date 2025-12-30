@@ -34,11 +34,20 @@ final class GpuResourceManager {
     }
 
     public MaterialHandle uploadMaterial(MaterialData materialData) {
-        TextureHandle textureHandle = materialData.textureData()
-            .map(this::uploadTexture)
-            .orElseGet(() -> defaultTexture);
+        TextureHandle baseColorHandle = resolveTexture(materialData.baseColorTexture());
+        TextureHandle normalHandle = resolveTexture(materialData.normalTexture());
+        TextureHandle metallicRoughnessHandle = resolveTexture(materialData.metallicRoughnessTexture());
+        TextureHandle aoHandle = resolveTexture(materialData.aoTexture());
+        TextureHandle emissiveHandle = resolveTexture(materialData.emissiveTexture());
         MaterialHandle handle = new MaterialHandle(materialId.incrementAndGet());
-        materials.put(handle, new GpuMaterial(materialData.baseColor(), textureHandle));
+        materials.put(handle, new GpuMaterial(
+            materialData.baseColor(),
+            baseColorHandle,
+            normalHandle,
+            metallicRoughnessHandle,
+            aoHandle,
+            emissiveHandle
+        ));
         logger.info("Uploaded material handle {}", handle.hashCode());
         return handle;
     }

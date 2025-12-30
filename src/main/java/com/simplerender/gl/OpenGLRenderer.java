@@ -39,13 +39,27 @@ public final class OpenGLRenderer implements MeshUploader {
     private final double[] cursorPosX = new double[1];
     private final double[] cursorPosY = new double[1];
 
+    private final String shaderName;
+
     public OpenGLRenderer(int chunkCount) {
+        this(chunkCount, "default");
+    }
+
+    public OpenGLRenderer(int chunkCount, String shaderName) {
         this.pipeline = new RenderPipeline(new FrustumCuller());
         this.shaderProgram = new ShaderProgram();
         this.resourceManager = new GpuResourceManager();
         this.pendingShaderName = "default";
         this.activeShaderName = "default";
         logger.info("Renderer initialized with {} GPU mesh slots", chunkCount);
+    }
+
+    public OpenGLRenderer(int chunkCount, String shaderName) {
+        this(chunkCount);
+        if (shaderName != null && !shaderName.isBlank()) {
+            this.pendingShaderName = shaderName;
+            this.activeShaderName = shaderName;
+        }
     }
 
     public void render(SceneSnapshot snapshot) {
