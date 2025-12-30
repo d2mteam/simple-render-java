@@ -6,31 +6,21 @@ import java.util.Optional;
 public final class MaterialData {
     private final float[] baseColor;
     private final TextureData baseColorTexture;
-    private final TextureData metallicRoughnessTexture;
     private final TextureData normalTexture;
-    private final TextureData occlusionTexture;
+    private final TextureData metallicRoughnessTexture;
+    private final TextureData aoTexture;
     private final TextureData emissiveTexture;
 
-    public MaterialData(float[] baseColor, TextureData baseColorTexture) {
-        this(baseColor, baseColorTexture, null, null, null, null);
-    }
-
-    public MaterialData(
-        float[] baseColor,
-        TextureData baseColorTexture,
-        TextureData metallicRoughnessTexture,
-        TextureData normalTexture,
-        TextureData occlusionTexture,
-        TextureData emissiveTexture
-    ) {
+    public MaterialData(float[] baseColor, TextureData baseColorTexture, TextureData normalTexture,
+                        TextureData metallicRoughnessTexture, TextureData aoTexture, TextureData emissiveTexture) {
         if (baseColor.length != 3) {
             throw new IllegalArgumentException("Base color must have 3 components");
         }
         this.baseColor = Arrays.copyOf(baseColor, baseColor.length);
         this.baseColorTexture = baseColorTexture;
-        this.metallicRoughnessTexture = metallicRoughnessTexture;
         this.normalTexture = normalTexture;
-        this.occlusionTexture = occlusionTexture;
+        this.metallicRoughnessTexture = metallicRoughnessTexture;
+        this.aoTexture = aoTexture;
         this.emissiveTexture = emissiveTexture;
     }
 
@@ -38,24 +28,20 @@ public final class MaterialData {
         return Arrays.copyOf(baseColor, baseColor.length);
     }
 
-    public Optional<TextureData> textureData() {
-        return Optional.ofNullable(baseColorTexture);
-    }
-
     public Optional<TextureData> baseColorTexture() {
         return Optional.ofNullable(baseColorTexture);
-    }
-
-    public Optional<TextureData> metallicRoughnessTexture() {
-        return Optional.ofNullable(metallicRoughnessTexture);
     }
 
     public Optional<TextureData> normalTexture() {
         return Optional.ofNullable(normalTexture);
     }
 
-    public Optional<TextureData> occlusionTexture() {
-        return Optional.ofNullable(occlusionTexture);
+    public Optional<TextureData> metallicRoughnessTexture() {
+        return Optional.ofNullable(metallicRoughnessTexture);
+    }
+
+    public Optional<TextureData> aoTexture() {
+        return Optional.ofNullable(aoTexture);
     }
 
     public Optional<TextureData> emissiveTexture() {

@@ -72,7 +72,14 @@ public final class Scene {
         RenderableChunk[] chunks = new RenderableChunk[meshData.length];
         for (int i = 0; i < meshData.length; i++) {
             MeshData mesh = MeshDataFactory.fromChunkMeshData(meshData[i]);
-            MaterialData material = new MaterialData(new float[] {0.2f, 0.8f, 0.4f}, textureData);
+            MaterialData material = new MaterialData(
+                new float[] {0.2f, 0.8f, 0.4f},
+                textureData,
+                null,
+                null,
+                null,
+                null
+            );
             MeshHandle meshHandle = meshUploader.uploadMesh(mesh);
             MaterialHandle materialHandle = meshUploader.uploadMaterial(material);
             chunks[i] = new RenderableChunk(new RenderItem(meshHandle, materialHandle));
