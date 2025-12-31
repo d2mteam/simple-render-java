@@ -18,6 +18,7 @@ public final class GlfwInputReader {
         boolean up = GLFW.glfwGetKey(window, GLFW.GLFW_KEY_SPACE) == GLFW.GLFW_PRESS;
         boolean down = GLFW.glfwGetKey(window, GLFW.GLFW_KEY_LEFT_SHIFT) == GLFW.GLFW_PRESS;
 
+        boolean allowLook = GLFW.glfwGetWindowAttrib(window, GLFW.GLFW_HOVERED) == GLFW.GLFW_TRUE;
         GLFW.glfwGetCursorPos(window, cursorPosX, cursorPosY);
         if (firstMouse) {
             lastMouseX = cursorPosX[0];

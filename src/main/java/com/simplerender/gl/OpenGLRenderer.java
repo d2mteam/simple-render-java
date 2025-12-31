@@ -38,7 +38,6 @@ public final class OpenGLRenderer implements MeshUploader {
     private long window;
     private final Queue<Runnable> pendingTasks = new ConcurrentLinkedQueue<>();
     private Thread renderThread;
-    private volatile boolean cursorInside = true;
 
     public OpenGLRenderer(int chunkCount) {
         this(chunkCount, "default");
@@ -144,7 +143,6 @@ public final class OpenGLRenderer implements MeshUploader {
         GLFW.glfwMakeContextCurrent(window);
         GLFW.glfwSwapInterval(1);
         GLFW.glfwSetInputMode(window, GLFW.GLFW_CURSOR, GLFW.GLFW_CURSOR_NORMAL);
-        GLFW.glfwSetCursorEnterCallback(window, (handle, entered) -> cursorInside = entered);
         GLFW.glfwShowWindow(window);
         GL.createCapabilities();
         GL11.glEnable(GL11.GL_DEPTH_TEST);
@@ -225,9 +223,6 @@ public final class OpenGLRenderer implements MeshUploader {
         return window;
     }
 
-    public boolean isCursorInside() {
-        return cursorInside;
-    }
 
     public <T> CompletableFuture<T> submit(Callable<T> task) {
         CompletableFuture<T> future = new CompletableFuture<>();

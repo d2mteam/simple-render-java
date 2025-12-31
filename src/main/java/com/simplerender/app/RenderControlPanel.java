@@ -29,6 +29,10 @@ public final class RenderControlPanel {
     private static final int CONTROL_WIDTH = 320;
     private static final int DEFAULT_RENDER_WIDTH = 960;
     private static final int DEFAULT_RENDER_HEIGHT = 600;
+    private static double lastRenderX = Double.NaN;
+    private static double lastRenderY = Double.NaN;
+    private static double lastRenderWidth = Double.NaN;
+    private static double lastRenderHeight = Double.NaN;
 
     private RenderControlPanel() {
     }
@@ -171,14 +175,28 @@ public final class RenderControlPanel {
             if (origin == null) {
                 return;
             }
-            int x = (int) Math.round(origin.getX());
-            int y = (int) Math.round(origin.getY());
-            int width = (int) Math.round(Math.max(renderPlaceholder.getWidth(), 1));
-            int height = (int) Math.round(Math.max(renderPlaceholder.getHeight(), 1));
-            renderer.setWindowSize(width, height);
-            renderer.setWindowPosition(x, y);
+            double x = origin.getX();
+            double y = origin.getY();
+            double width = Math.max(renderPlaceholder.getWidth(), 1);
+            double height = Math.max(renderPlaceholder.getHeight(), 1);
+            if (shouldSync(x, y, width, height)) {
+                renderer.setWindowSize((int) Math.round(width), (int) Math.round(height));
+                renderer.setWindowPosition((int) Math.round(x), (int) Math.round(y));
+                lastRenderX = x;
+                lastRenderY = y;
+                lastRenderWidth = width;
+                lastRenderHeight = height;
+            }
         } catch (Exception e) {
             logger.warn("Failed to sync render window position", e);
         }
+    }
+
+    private static boolean shouldSync(double x, double y, double width, double height) {
+        double delta = 0.5;
+        return Math.abs(x - lastRenderX) > delta
+            || Math.abs(y - lastRenderY) > delta
+            || Math.abs(width - lastRenderWidth) > delta
+            || Math.abs(height - lastRenderHeight) > delta;
     }
 }
