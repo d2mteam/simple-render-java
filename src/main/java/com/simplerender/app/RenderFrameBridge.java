@@ -10,7 +10,7 @@ import java.util.ArrayDeque;
 import java.util.Deque;
 
 public final class RenderFrameBridge {
-    private static final PixelFormat<ByteBuffer> PIXEL_FORMAT = PixelFormat.getByteBgra();
+    private static final PixelFormat<ByteBuffer> PIXEL_FORMAT = PixelFormat.getByteBgraInstance();
 
     private final Object lock = new Object();
     private final ImageView imageView;
