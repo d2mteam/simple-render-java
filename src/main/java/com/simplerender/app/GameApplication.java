@@ -16,10 +16,12 @@ public final class GameApplication {
     private final GameLoop gameLoop;
     private final Scene scene;
     private final OpenGLRenderer renderer;
+    private final JavaFxInputAdapter inputAdapter;
 
     public GameApplication(EngineConfig config) {
         this.config = config;
         this.renderer = new OpenGLRenderer(config.chunkCount());
+        this.inputAdapter = new JavaFxInputAdapter();
         if (config.shaderName() != null && !config.shaderName().isBlank()) {
             this.renderer.requestShader(config.shaderName());
         }
@@ -38,8 +40,8 @@ public final class GameApplication {
             logger.info("No model selected; using default chunks");
         }
         this.scene = Scene.bootstrap(config, renderer, importedModel);
-        RenderControlPanel.launch(scene, renderer, importService);
-        this.gameLoop = new GameLoop(config, new Time(), scene, renderer);
+        RenderControlPanel.launch(scene, renderer, importService, inputAdapter);
+        this.gameLoop = new GameLoop(config, new Time(), scene, renderer, inputAdapter);
     }
 
     public void run() {

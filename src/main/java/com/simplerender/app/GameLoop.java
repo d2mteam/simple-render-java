@@ -2,7 +2,6 @@ package com.simplerender.app;
 
 import com.simplerender.scene.Scene;
 import com.simplerender.gl.OpenGLRenderer;
-import com.simplerender.gl.GlfwInputReader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -13,14 +12,14 @@ public final class GameLoop {
     private final Time time;
     private final Scene scene;
     private final OpenGLRenderer renderer;
-    private final GlfwInputReader inputReader;
+    private final JavaFxInputAdapter inputAdapter;
 
-    public GameLoop(EngineConfig config, Time time, Scene scene, OpenGLRenderer renderer) {
+    public GameLoop(EngineConfig config, Time time, Scene scene, OpenGLRenderer renderer, JavaFxInputAdapter inputAdapter) {
         this.config = config;
         this.time = time;
         this.scene = scene;
         this.renderer = renderer;
-        this.inputReader = new GlfwInputReader();
+        this.inputAdapter = inputAdapter;
     }
 
     public void run() {
@@ -33,8 +32,7 @@ public final class GameLoop {
         }
         while (!renderer.shouldClose()) {
             time.update();
-            renderer.pollEvents();
-            scene.update(time, inputReader.readInput(renderer.windowHandle(), renderer.isCursorInside()));
+            scene.update(time, inputAdapter.consumeInput());
             renderer.render(scene.snapshot());
             frame++;
         }

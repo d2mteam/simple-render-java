@@ -14,14 +14,20 @@ import com.simplerender.render.TextureHandle;
 import com.simplerender.render.culling.FrustumCuller;
 import com.simplerender.render.pipeline.RenderPipeline;
 import com.simplerender.scene.SceneSnapshot;
+import com.simplerender.app.RenderFrameBridge;
+import java.nio.ByteBuffer;
 import java.util.Queue;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.lwjgl.glfw.GLFW;
-import org.lwjgl.opengl.GL;
 import org.lwjgl.opengl.GL11;
+import org.lwjgl.opengl.GL;
 import org.lwjgl.opengl.GL13;
+import org.lwjgl.opengl.GL12;
+import org.lwjgl.opengl.GL30;
+import org.lwjgl.BufferUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -38,6 +44,14 @@ public final class OpenGLRenderer implements MeshUploader {
     private long window;
     private final Queue<Runnable> pendingTasks = new ConcurrentLinkedQueue<>();
     private Thread renderThread;
+    private final AtomicBoolean stopRequested = new AtomicBoolean(false);
+    private RenderFrameBridge frameBridge;
+    private int framebuffer;
+    private int colorTexture;
+    private int depthBuffer;
+    private int renderWidth = 1;
+    private int renderHeight = 1;
+    private ByteBuffer pixelBuffer;
 
     public OpenGLRenderer(int chunkCount) {
         this(chunkCount, "default");
@@ -60,6 +74,8 @@ public final class OpenGLRenderer implements MeshUploader {
         if (!pipeline.shouldRender(snapshot.camera())) {
             return;
         }
+        GL30.glBindFramebuffer(GL30.GL_FRAMEBUFFER, framebuffer);
+        GL11.glViewport(0, 0, renderWidth, renderHeight);
         GL11.glClear(GL11.GL_COLOR_BUFFER_BIT | GL11.GL_DEPTH_BUFFER_BIT);
         shaderProgram.bind();
         uniforms.updateView(snapshot.camera().position(), snapshot.camera().forward(), snapshot.camera().up());
@@ -84,18 +100,19 @@ public final class OpenGLRenderer implements MeshUploader {
             bindTextureUnit(GL13.GL_TEXTURE4, resourceManager.texture(material.emissiveTexture()));
             mesh.draw();
         }
-        GLFW.glfwSwapBuffers(window);
-    }
-
-    public void pollEvents() {
-        if (!initialized) {
-            return;
+        if (frameBridge != null) {
+            ensurePixelBuffer();
+            GL11.glReadBuffer(GL30.GL_COLOR_ATTACHMENT0);
+            GL11.glReadPixels(0, 0, renderWidth, renderHeight, GL12.GL_BGRA, GL11.GL_UNSIGNED_BYTE, pixelBuffer);
+            pixelBuffer.rewind();
+            frameBridge.submitFrame(pixelBuffer, renderWidth, renderHeight);
         }
-        GLFW.glfwPollEvents();
+        GL30.glBindFramebuffer(GL30.GL_FRAMEBUFFER, 0);
+        GL11.glFlush();
     }
 
     public boolean shouldClose() {
-        return initialized && GLFW.glfwWindowShouldClose(window);
+        return stopRequested.get();
     }
 
     public void requestShader(String shaderName) {
@@ -133,21 +150,17 @@ public final class OpenGLRenderer implements MeshUploader {
             throw new IllegalStateException("GLFW init failed");
         }
         GLFW.glfwWindowHint(GLFW.GLFW_VISIBLE, GLFW.GLFW_FALSE);
-        GLFW.glfwWindowHint(GLFW.GLFW_DECORATED, GLFW.GLFW_FALSE);
-        GLFW.glfwWindowHint(GLFW.GLFW_RESIZABLE, GLFW.GLFW_TRUE);
-        window = GLFW.glfwCreateWindow(800, 600, "Simple Render", 0, 0);
+        GLFW.glfwWindowHint(GLFW.GLFW_RESIZABLE, GLFW.GLFW_FALSE);
+        window = GLFW.glfwCreateWindow(1, 1, "Simple Render", 0, 0);
         if (window == 0) {
             logger.error("Failed to create GLFW window");
             throw new IllegalStateException("Window creation failed");
         }
         GLFW.glfwMakeContextCurrent(window);
-        GLFW.glfwSwapInterval(1);
-        GLFW.glfwSetInputMode(window, GLFW.GLFW_CURSOR, GLFW.GLFW_CURSOR_NORMAL);
-        GLFW.glfwShowWindow(window);
         GL.createCapabilities();
         GL11.glEnable(GL11.GL_DEPTH_TEST);
         GL11.glClearColor(0.12f, 0.12f, 0.12f, 1.0f);
-        uniforms = new RenderUniforms(800.0f / 600.0f);
+        uniforms = new RenderUniforms(1.0f);
         resourceManager.initDefaultTexture(TextureDataFactory.checkerboard(2, 1));
         ShaderSource shaderSource = ShaderSourceLoader.loadByName(pendingShaderName);
         shaderProgram.init(shaderSource.vertexSource(), shaderSource.fragmentSource());
@@ -155,37 +168,50 @@ public final class OpenGLRenderer implements MeshUploader {
         shaderProgram.setUniformMat4("uProjection", uniforms.projectionMatrix());
         shaderProgram.setUniformInt("uTexture", 0);
         activeShaderName = pendingShaderName;
+        resizeRenderTarget(renderWidth, renderHeight);
         initialized = true;
         logger.info("OpenGL context initialized");
     }
 
-    public void setWindowPosition(int x, int y) {
+    public void requestResize(int width, int height) {
         ensureInitialized();
         if (Thread.currentThread() != renderThread) {
-            submit(() -> setWindowPositionInternal(x, y));
+            submit(() -> resizeRenderTarget(width, height));
             return;
         }
-        setWindowPositionInternal(x, y);
+        resizeRenderTarget(width, height);
     }
 
-    public void setWindowSize(int width, int height) {
-        ensureInitialized();
-        if (Thread.currentThread() != renderThread) {
-            submit(() -> setWindowSizeInternal(width, height));
-            return;
-        }
-        setWindowSizeInternal(width, height);
-    }
-
-    private void setWindowPositionInternal(int x, int y) {
-        GLFW.glfwSetWindowPos(window, x, y);
-    }
-
-    private void setWindowSizeInternal(int width, int height) {
+    private void resizeRenderTarget(int width, int height) {
         if (width <= 0 || height <= 0) {
             return;
         }
-        GLFW.glfwSetWindowSize(window, width, height);
+        if (width == renderWidth && height == renderHeight) {
+            return;
+        }
+        renderWidth = width;
+        renderHeight = height;
+        disposeRenderTarget();
+        framebuffer = GL30.glGenFramebuffers();
+        colorTexture = GL11.glGenTextures();
+        depthBuffer = GL30.glGenRenderbuffers();
+
+        GL30.glBindFramebuffer(GL30.GL_FRAMEBUFFER, framebuffer);
+        GL11.glBindTexture(GL11.GL_TEXTURE_2D, colorTexture);
+        GL11.glTexImage2D(GL11.GL_TEXTURE_2D, 0, GL11.GL_RGBA8, width, height, 0, GL11.GL_RGBA, GL11.GL_UNSIGNED_BYTE, (ByteBuffer) null);
+        GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MIN_FILTER, GL11.GL_LINEAR);
+        GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MAG_FILTER, GL11.GL_LINEAR);
+        GL30.glFramebufferTexture2D(GL30.GL_FRAMEBUFFER, GL30.GL_COLOR_ATTACHMENT0, GL11.GL_TEXTURE_2D, colorTexture, 0);
+
+        GL30.glBindRenderbuffer(GL30.GL_RENDERBUFFER, depthBuffer);
+        GL30.glRenderbufferStorage(GL30.GL_RENDERBUFFER, GL30.GL_DEPTH24_STENCIL8, width, height);
+        GL30.glFramebufferRenderbuffer(GL30.GL_FRAMEBUFFER, GL30.GL_DEPTH_STENCIL_ATTACHMENT, GL30.GL_RENDERBUFFER, depthBuffer);
+
+        int status = GL30.glCheckFramebufferStatus(GL30.GL_FRAMEBUFFER);
+        if (status != GL30.GL_FRAMEBUFFER_COMPLETE) {
+            logger.error("Framebuffer incomplete with status {}", status);
+        }
+        GL30.glBindFramebuffer(GL30.GL_FRAMEBUFFER, 0);
         GL11.glViewport(0, 0, width, height);
         uniforms.updateProjection((float) width / (float) height);
         shaderProgram.bind();
@@ -223,6 +249,14 @@ public final class OpenGLRenderer implements MeshUploader {
         return window;
     }
 
+    public void requestStop() {
+        stopRequested.set(true);
+    }
+
+    public void setFrameBridge(RenderFrameBridge frameBridge) {
+        this.frameBridge = frameBridge;
+    }
+
 
     public <T> CompletableFuture<T> submit(Callable<T> task) {
         CompletableFuture<T> future = new CompletableFuture<>();
@@ -258,6 +292,30 @@ public final class OpenGLRenderer implements MeshUploader {
     private void ensureInitialized() {
         if (!initialized) {
             throw new IllegalStateException("Renderer not initialized");
+        }
+    }
+
+    private void ensurePixelBuffer() {
+        int size = renderWidth * renderHeight * 4;
+        if (pixelBuffer == null || pixelBuffer.capacity() < size) {
+            pixelBuffer = BufferUtils.createByteBuffer(size);
+        } else {
+            pixelBuffer.clear();
+        }
+    }
+
+    private void disposeRenderTarget() {
+        if (framebuffer != 0) {
+            GL30.glDeleteFramebuffers(framebuffer);
+            framebuffer = 0;
+        }
+        if (colorTexture != 0) {
+            GL11.glDeleteTextures(colorTexture);
+            colorTexture = 0;
+        }
+        if (depthBuffer != 0) {
+            GL30.glDeleteRenderbuffers(depthBuffer);
+            depthBuffer = 0;
         }
     }
 }

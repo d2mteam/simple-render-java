@@ -4,8 +4,8 @@ import com.simplerender.asset.plugin.ModelImporter;
 import com.simplerender.gl.OpenGLRenderer;
 import javafx.application.Platform;
 import javafx.geometry.Insets;
-import javafx.geometry.Point2D;
 import javafx.geometry.Pos;
+import javafx.scene.Scene;
 import javafx.scene.control.Button;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
@@ -13,8 +13,10 @@ import javafx.scene.control.ListView;
 import javafx.scene.control.TextField;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.GridPane;
-import javafx.scene.layout.Region;
+import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
+import javafx.scene.image.ImageView;
+import javafx.scene.image.WritableImage;
 import javafx.stage.Stage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -29,23 +31,30 @@ public final class RenderControlPanel {
     private static final int CONTROL_WIDTH = 320;
     private static final int DEFAULT_RENDER_WIDTH = 960;
     private static final int DEFAULT_RENDER_HEIGHT = 600;
-    private static double lastRenderX = Double.NaN;
-    private static double lastRenderY = Double.NaN;
-    private static double lastRenderWidth = Double.NaN;
-    private static double lastRenderHeight = Double.NaN;
+    private static final int GAP = 12;
 
     private RenderControlPanel() {
     }
 
-    public static void launch(com.simplerender.scene.Scene scene, OpenGLRenderer renderer, ModelImportService importService) {
+    public static void launch(
+        com.simplerender.scene.Scene scene,
+        OpenGLRenderer renderer,
+        ModelImportService importService,
+        JavaFxInputAdapter inputAdapter
+    ) {
         if (started.compareAndSet(false, true)) {
-            Platform.startup(() -> showStage(scene, renderer, importService));
+            Platform.startup(() -> showStage(scene, renderer, importService, inputAdapter));
         } else {
-            Platform.runLater(() -> showStage(scene, renderer, importService));
+            Platform.runLater(() -> showStage(scene, renderer, importService, inputAdapter));
         }
     }
 
-    private static void showStage(com.simplerender.scene.Scene scene, OpenGLRenderer renderer, ModelImportService importService) {
+    private static void showStage(
+        com.simplerender.scene.Scene scene,
+        OpenGLRenderer renderer,
+        ModelImportService importService,
+        JavaFxInputAdapter inputAdapter
+    ) {
         Stage stage = new Stage();
         stage.setTitle("Simple Render");
         BorderPane root = new BorderPane();
@@ -140,22 +149,30 @@ public final class RenderControlPanel {
         controls.setPrefWidth(CONTROL_WIDTH);
         root.setLeft(controls);
 
-        Region renderPlaceholder = new Region();
-        renderPlaceholder.setMinSize(400, 300);
-        renderPlaceholder.setPrefSize(DEFAULT_RENDER_WIDTH, DEFAULT_RENDER_HEIGHT);
-        root.setCenter(renderPlaceholder);
+        ImageView renderView = new ImageView(new WritableImage(DEFAULT_RENDER_WIDTH, DEFAULT_RENDER_HEIGHT));
+        renderView.setPreserveRatio(false);
+        renderView.setSmooth(false);
+
+        StackPane renderPane = new StackPane(renderView);
+        renderPane.setMinSize(400, 300);
+        renderPane.setPrefSize(DEFAULT_RENDER_WIDTH, DEFAULT_RENDER_HEIGHT);
+        renderView.fitWidthProperty().bind(renderPane.widthProperty());
+        renderView.fitHeightProperty().bind(renderPane.heightProperty());
+        root.setCenter(renderPane);
+
+        RenderFrameBridge frameBridge = new RenderFrameBridge(renderView);
+        renderer.setFrameBridge(frameBridge);
 
         stage.setMinWidth(CONTROL_WIDTH + GAP + 400);
         stage.setMinHeight(360);
-        stage.setScene(new javafx.scene.Scene(root, CONTROL_WIDTH + GAP + DEFAULT_RENDER_WIDTH, DEFAULT_RENDER_HEIGHT + 24));
+        Scene uiScene = new javafx.scene.Scene(root, CONTROL_WIDTH + GAP + DEFAULT_RENDER_WIDTH, DEFAULT_RENDER_HEIGHT + 24);
+        stage.setScene(uiScene);
         stage.show();
-        stage.xProperty().addListener((obs, oldValue, newValue) -> syncRenderWindow(renderPlaceholder, renderer));
-        stage.yProperty().addListener((obs, oldValue, newValue) -> syncRenderWindow(renderPlaceholder, renderer));
-        stage.widthProperty().addListener((obs, oldValue, newValue) -> syncRenderWindow(renderPlaceholder, renderer));
-        stage.heightProperty().addListener((obs, oldValue, newValue) -> syncRenderWindow(renderPlaceholder, renderer));
-        renderPlaceholder.widthProperty().addListener((obs, oldValue, newValue) -> syncRenderWindow(renderPlaceholder, renderer));
-        renderPlaceholder.heightProperty().addListener((obs, oldValue, newValue) -> syncRenderWindow(renderPlaceholder, renderer));
-        Platform.runLater(() -> syncRenderWindow(renderPlaceholder, renderer));
+        inputAdapter.attach(uiScene, renderPane);
+        renderPane.widthProperty().addListener((obs, oldValue, newValue) -> requestResize(renderer, renderPane));
+        renderPane.heightProperty().addListener((obs, oldValue, newValue) -> requestResize(renderer, renderPane));
+        Platform.runLater(() -> requestResize(renderer, renderPane));
+        stage.setOnCloseRequest(event -> renderer.requestStop());
         logger.info("Render control panel opened");
     }
 
@@ -169,34 +186,12 @@ public final class RenderControlPanel {
         }
     }
 
-    private static void syncRenderWindow(Region renderPlaceholder, OpenGLRenderer renderer) {
-        try {
-            Point2D origin = renderPlaceholder.localToScreen(0, 0);
-            if (origin == null) {
-                return;
-            }
-            double x = origin.getX();
-            double y = origin.getY();
-            double width = Math.max(renderPlaceholder.getWidth(), 1);
-            double height = Math.max(renderPlaceholder.getHeight(), 1);
-            if (shouldSync(x, y, width, height)) {
-                renderer.setWindowSize((int) Math.round(width), (int) Math.round(height));
-                renderer.setWindowPosition((int) Math.round(x), (int) Math.round(y));
-                lastRenderX = x;
-                lastRenderY = y;
-                lastRenderWidth = width;
-                lastRenderHeight = height;
-            }
-        } catch (Exception e) {
-            logger.warn("Failed to sync render window position", e);
+    private static void requestResize(OpenGLRenderer renderer, StackPane renderPane) {
+        double width = renderPane.getWidth();
+        double height = renderPane.getHeight();
+        if (width <= 1 || height <= 1) {
+            return;
         }
-    }
-
-    private static boolean shouldSync(double x, double y, double width, double height) {
-        double delta = 0.5;
-        return Math.abs(x - lastRenderX) > delta
-            || Math.abs(y - lastRenderY) > delta
-            || Math.abs(width - lastRenderWidth) > delta
-            || Math.abs(height - lastRenderHeight) > delta;
+        renderer.requestResize((int) Math.round(width), (int) Math.round(height));
     }
 }
