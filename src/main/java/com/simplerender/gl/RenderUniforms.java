@@ -29,4 +29,9 @@ final class RenderUniforms {
         float[] updated = Matrix4f.lookAt(position, center, up);
         System.arraycopy(updated, 0, viewMatrix, 0, updated.length);
     }
+
+    public void updateProjection(float aspect) {
+        float[] updated = Matrix4f.perspective((float) Math.toRadians(60.0f), aspect, 0.1f, 100.0f);
+        System.arraycopy(updated, 0, projectionMatrix, 0, updated.length);
+    }
 }
