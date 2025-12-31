@@ -67,9 +67,17 @@ public final class RenderControlPanel {
                 logger.warn("Failed to import model from {}", modelPath.get());
                 return;
             }
-            int index = scene.addImportedObject(renderer, imported.get());
-            refreshObjectList(scene, objectList);
-            objectList.getSelectionModel().select(index);
+            renderer.submit(() -> scene.addImportedObject(renderer, imported.get()))
+                .whenComplete((index, error) -> {
+                    if (error != null) {
+                        logger.error("Failed to upload imported model {}", modelPath.get(), error);
+                        return;
+                    }
+                    Platform.runLater(() -> {
+                        refreshObjectList(scene, objectList);
+                        objectList.getSelectionModel().select(index);
+                    });
+                });
         });
 
         Button applyTransform = new Button("Apply Transform");
