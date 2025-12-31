@@ -133,6 +133,7 @@ public final class OpenGLRenderer implements MeshUploader {
             throw new IllegalStateException("GLFW init failed");
         }
         GLFW.glfwWindowHint(GLFW.GLFW_VISIBLE, GLFW.GLFW_FALSE);
+        GLFW.glfwWindowHint(GLFW.GLFW_DECORATED, GLFW.GLFW_FALSE);
         GLFW.glfwWindowHint(GLFW.GLFW_RESIZABLE, GLFW.GLFW_FALSE);
         window = GLFW.glfwCreateWindow(800, 600, "Simple Render", 0, 0);
         if (window == 0) {
@@ -156,6 +157,23 @@ public final class OpenGLRenderer implements MeshUploader {
         activeShaderName = pendingShaderName;
         initialized = true;
         logger.info("OpenGL context initialized");
+    }
+
+    public void setWindowPosition(int x, int y) {
+        ensureInitialized();
+        GLFW.glfwSetWindowPos(window, x, y);
+    }
+
+    public void setWindowSize(int width, int height) {
+        ensureInitialized();
+        if (width <= 0 || height <= 0) {
+            return;
+        }
+        GLFW.glfwSetWindowSize(window, width, height);
+        GL11.glViewport(0, 0, width, height);
+        uniforms.updateProjection((float) width / (float) height);
+        shaderProgram.bind();
+        shaderProgram.setUniformMat4("uProjection", uniforms.projectionMatrix());
     }
 
     private void applyPendingShader() {
