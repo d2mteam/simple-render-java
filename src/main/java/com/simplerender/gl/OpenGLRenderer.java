@@ -2,6 +2,7 @@ package com.simplerender.gl;
 
 import com.simplerender.asset.MaterialData;
 import com.simplerender.asset.MeshData;
+import com.simplerender.asset.SamplerData;
 import com.simplerender.asset.ShaderSource;
 import com.simplerender.asset.ShaderSourceLoader;
 import com.simplerender.asset.TextureData;
@@ -27,6 +28,7 @@ import org.lwjgl.opengl.GL;
 import org.lwjgl.opengl.GL13;
 import org.lwjgl.opengl.GL12;
 import org.lwjgl.opengl.GL30;
+import org.lwjgl.opengl.GL33;
 import org.lwjgl.BufferUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -94,11 +96,31 @@ public final class OpenGLRenderer implements MeshUploader {
             }
             shaderProgram.setUniformMat4("uModel", item.transform().matrix());
             shaderProgram.setUniformVec3("uBaseColor", material.baseColor());
-            bindTextureUnit(GL13.GL_TEXTURE0, resourceManager.texture(material.baseColorTexture()));
-            bindTextureUnit(GL13.GL_TEXTURE1, resourceManager.texture(material.normalTexture()));
-            bindTextureUnit(GL13.GL_TEXTURE2, resourceManager.texture(material.metallicRoughnessTexture()));
-            bindTextureUnit(GL13.GL_TEXTURE3, resourceManager.texture(material.aoTexture()));
-            bindTextureUnit(GL13.GL_TEXTURE4, resourceManager.texture(material.emissiveTexture()));
+            bindTextureUnit(
+                GL13.GL_TEXTURE0,
+                resourceManager.texture(material.baseColorTexture()),
+                resourceManager.sampler(material.baseColorSampler())
+            );
+            bindTextureUnit(
+                GL13.GL_TEXTURE1,
+                resourceManager.texture(material.normalTexture()),
+                resourceManager.sampler(material.normalSampler())
+            );
+            bindTextureUnit(
+                GL13.GL_TEXTURE2,
+                resourceManager.texture(material.metallicRoughnessTexture()),
+                resourceManager.sampler(material.metallicRoughnessSampler())
+            );
+            bindTextureUnit(
+                GL13.GL_TEXTURE3,
+                resourceManager.texture(material.aoTexture()),
+                resourceManager.sampler(material.aoSampler())
+            );
+            bindTextureUnit(
+                GL13.GL_TEXTURE4,
+                resourceManager.texture(material.emissiveTexture()),
+                resourceManager.sampler(material.emissiveSampler())
+            );
             mesh.draw();
         }
         if (frameBridge != null) {
@@ -183,6 +205,7 @@ public final class OpenGLRenderer implements MeshUploader {
             TextureDataFactory.solidColor(255, 255, 255, 255),
             TextureDataFactory.solidColor(0, 0, 0, 255)
         );
+        resourceManager.initDefaultSampler(SamplerData.defaults());
         ShaderSource shaderSource = ShaderSourceLoader.loadByName(pendingShaderName);
         shaderProgram.init(shaderSource.vertexSource(), shaderSource.fragmentSource());
         shaderProgram.bind();
@@ -265,13 +288,17 @@ public final class OpenGLRenderer implements MeshUploader {
         shaderProgram.setUniformIntIfPresent("uEmissiveTex", 4);
     }
 
-    private void bindTextureUnit(int textureUnit, GpuTexture texture) {
+    private void bindTextureUnit(int textureUnit, GpuTexture texture, GpuSampler sampler) {
         GpuTexture resolved = texture != null ? texture : resourceManager.defaultTexture();
         if (resolved == null) {
             return;
         }
+        GpuSampler resolvedSampler = sampler != null ? sampler : resourceManager.defaultSampler();
         GL13.glActiveTexture(textureUnit);
         GL11.glBindTexture(GL11.GL_TEXTURE_2D, resolved.id());
+        if (resolvedSampler != null) {
+            GL33.glBindSampler(textureUnit - GL13.GL_TEXTURE0, resolvedSampler.id());
+        }
     }
 
     public long windowHandle() {

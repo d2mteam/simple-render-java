@@ -5,7 +5,9 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.simplerender.asset.MaterialData;
 import com.simplerender.asset.MeshData;
+import com.simplerender.asset.SamplerData;
 import com.simplerender.asset.TextureData;
+import com.simplerender.asset.TextureSlot;
 import com.simplerender.asset.plugin.ModelImporter;
 import com.simplerender.math.Matrix4f;
 import org.pf4j.Extension;
@@ -43,11 +45,11 @@ public final class GltfModelImporter implements ModelImporter {
             MeshParts meshParts = readSceneMeshes(root, accessors, bufferViews, bufferBytes);
 
             float[] baseColor = new float[] {0.8f, 0.8f, 0.8f};
-            TextureData baseColorTexture = null;
-            TextureData normalTexture = null;
-            TextureData metallicRoughnessTexture = null;
-            TextureData aoTexture = null;
-            TextureData emissiveTexture = null;
+            TextureSlot baseColorTexture = null;
+            TextureSlot normalTexture = null;
+            TextureSlot metallicRoughnessTexture = null;
+            TextureSlot aoTexture = null;
+            TextureSlot emissiveTexture = null;
             if (root.has("materials")) {
                 JsonObject material = root.getAsJsonArray("materials").get(0).getAsJsonObject();
                 if (material.has("pbrMetallicRoughness")) {
@@ -345,7 +347,7 @@ public final class GltfModelImporter implements ModelImporter {
         return Files.readAllBytes(base.resolve(uri));
     }
 
-    private TextureData loadTextureByIndex(int textureIndex, JsonObject root, byte[] bufferBytes, Path baseDir) {
+    private TextureSlot loadTextureByIndex(int textureIndex, JsonObject root, byte[] bufferBytes, Path baseDir) {
         if (!root.has("textures") || !root.has("images")) {
             logger.warn("glTF texture referenced but textures/images arrays are missing");
             return null;
@@ -356,6 +358,11 @@ public final class GltfModelImporter implements ModelImporter {
             return null;
         }
         int sourceIndex = texture.get("source").getAsInt();
+        SamplerData samplerData = null;
+        if (texture.has("sampler")) {
+            int samplerIndex = texture.get("sampler").getAsInt();
+            samplerData = loadSamplerByIndex(samplerIndex, root);
+        }
         JsonObject image = root.getAsJsonArray("images").get(sourceIndex).getAsJsonObject();
         try {
             byte[] imageBytes = readImageBytes(image, root, bufferBytes, baseDir);
@@ -368,11 +375,29 @@ public final class GltfModelImporter implements ModelImporter {
                 return null;
             }
             logger.info("Loaded glTF texture image {}", sourceIndex);
-            return buildTextureData(bufferedImage);
+            return new TextureSlot(buildTextureData(bufferedImage), samplerData);
         } catch (Exception e) {
             logger.warn("Failed to load glTF texture image {}", sourceIndex, e);
             return null;
         }
+    }
+
+    private SamplerData loadSamplerByIndex(int samplerIndex, JsonObject root) {
+        if (!root.has("samplers")) {
+            logger.warn("glTF sampler referenced but samplers array is missing");
+            return null;
+        }
+        JsonArray samplers = root.getAsJsonArray("samplers");
+        if (samplerIndex < 0 || samplerIndex >= samplers.size()) {
+            logger.warn("glTF sampler index {} out of range", samplerIndex);
+            return null;
+        }
+        JsonObject sampler = samplers.get(samplerIndex).getAsJsonObject();
+        int minFilter = sampler.has("minFilter") ? sampler.get("minFilter").getAsInt() : SamplerData.LINEAR;
+        int magFilter = sampler.has("magFilter") ? sampler.get("magFilter").getAsInt() : SamplerData.LINEAR;
+        int wrapS = sampler.has("wrapS") ? sampler.get("wrapS").getAsInt() : SamplerData.REPEAT;
+        int wrapT = sampler.has("wrapT") ? sampler.get("wrapT").getAsInt() : SamplerData.REPEAT;
+        return new SamplerData(minFilter, magFilter, wrapS, wrapT);
     }
 
     private byte[] readImageBytes(JsonObject image, JsonObject root, byte[] bufferBytes, Path baseDir)
