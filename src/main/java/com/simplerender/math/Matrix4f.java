@@ -47,4 +47,19 @@ public final class Matrix4f {
         m[14] = f.dot(eye);
         return m;
     }
+
+    public static float[] multiply(float[] left, float[] right) {
+        float[] result = new float[16];
+        for (int col = 0; col < 4; col++) {
+            int colOffset = col * 4;
+            for (int row = 0; row < 4; row++) {
+                result[colOffset + row] =
+                    left[row] * right[colOffset]
+                        + left[row + 4] * right[colOffset + 1]
+                        + left[row + 8] * right[colOffset + 2]
+                        + left[row + 12] * right[colOffset + 3];
+            }
+        }
+        return result;
+    }
 }

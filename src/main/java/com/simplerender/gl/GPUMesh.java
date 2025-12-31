@@ -70,6 +70,10 @@ final class GPUMesh {
         GL11.glDrawElements(GL11.GL_TRIANGLES, indexCount, GL11.GL_UNSIGNED_INT, 0);
     }
 
+    public MeshData snapshot() {
+        return lastUpload;
+    }
+
     private void ensureInterleavedCapacity(int required) {
         if (interleaved == null || interleaved.length < required) {
             interleaved = new float[required];

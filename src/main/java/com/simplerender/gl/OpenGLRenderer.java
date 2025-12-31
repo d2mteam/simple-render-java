@@ -71,9 +71,6 @@ public final class OpenGLRenderer implements MeshUploader {
         ensureInitialized();
         drainPendingTasks();
         applyPendingShader();
-        if (!pipeline.shouldRender(snapshot.camera())) {
-            return;
-        }
         GL30.glBindFramebuffer(GL30.GL_FRAMEBUFFER, framebuffer);
         GL11.glViewport(0, 0, renderWidth, renderHeight);
         GL11.glClear(GL11.GL_COLOR_BUFFER_BIT | GL11.GL_DEPTH_BUFFER_BIT);
@@ -82,6 +79,7 @@ public final class OpenGLRenderer implements MeshUploader {
         shaderProgram.setUniformMat4("uProjection", uniforms.projectionMatrix());
         shaderProgram.setUniformMat4("uView", uniforms.viewMatrix());
         shaderProgram.setUniformVec3("uLightDir", uniforms.lightDirection());
+        pipeline.updateFrustum(uniforms.projectionMatrix(), uniforms.viewMatrix());
         RenderItem[] renderItems = snapshot.renderItems();
         for (int i = 0; i < renderItems.length; i++) {
             RenderItem item = renderItems[i];
@@ -89,6 +87,9 @@ public final class OpenGLRenderer implements MeshUploader {
             GpuResourceManager.GpuMaterial material = resourceManager.material(item.materialHandle());
             if (mesh == null || material == null) {
                 logger.error("Missing GPU resources for render item {}", i);
+                continue;
+            }
+            if (!pipeline.shouldRender(item, mesh.snapshot())) {
                 continue;
             }
             shaderProgram.setUniformMat4("uModel", item.transform().matrix());
