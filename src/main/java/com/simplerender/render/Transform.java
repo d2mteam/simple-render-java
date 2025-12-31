@@ -1,5 +1,7 @@
 package com.simplerender.render;
 
+import com.simplerender.math.Vector3f;
+
 public final class Transform {
     private float x;
     private float y;
@@ -14,6 +16,14 @@ public final class Transform {
 
     public synchronized void setScale(float scale) {
         this.scale = scale;
+    }
+
+    public synchronized Vector3f position() {
+        return new Vector3f(x, y, z);
+    }
+
+    public synchronized float scale() {
+        return scale;
     }
 
     public synchronized float[] matrix() {
