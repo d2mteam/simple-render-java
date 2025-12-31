@@ -14,6 +14,10 @@ import com.simplerender.render.TextureHandle;
 import com.simplerender.render.culling.FrustumCuller;
 import com.simplerender.render.pipeline.RenderPipeline;
 import com.simplerender.scene.SceneSnapshot;
+import java.util.Queue;
+import java.util.concurrent.Callable;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import org.lwjgl.glfw.GLFW;
 import org.lwjgl.opengl.GL;
 import org.lwjgl.opengl.GL11;
@@ -32,6 +36,9 @@ public final class OpenGLRenderer implements MeshUploader {
     private String pendingShaderName;
     private String activeShaderName;
     private long window;
+    private final Queue<Runnable> pendingTasks = new ConcurrentLinkedQueue<>();
+    private Thread renderThread;
+    private volatile WindowLayout pendingLayout;
 
     public OpenGLRenderer(int chunkCount) {
         this(chunkCount, "default");
@@ -49,6 +56,8 @@ public final class OpenGLRenderer implements MeshUploader {
 
     public void render(SceneSnapshot snapshot) {
         ensureInitialized();
+        drainPendingTasks();
+        applyPendingWindowLayout();
         applyPendingShader();
         if (!pipeline.shouldRender(snapshot.camera())) {
             return;
@@ -120,12 +129,14 @@ public final class OpenGLRenderer implements MeshUploader {
         if (initialized) {
             return;
         }
+        renderThread = Thread.currentThread();
         if (!GLFW.glfwInit()) {
             logger.error("Failed to initialize GLFW");
             throw new IllegalStateException("GLFW init failed");
         }
         GLFW.glfwWindowHint(GLFW.GLFW_VISIBLE, GLFW.GLFW_FALSE);
-        GLFW.glfwWindowHint(GLFW.GLFW_RESIZABLE, GLFW.GLFW_FALSE);
+        GLFW.glfwWindowHint(GLFW.GLFW_DECORATED, GLFW.GLFW_FALSE);
+        GLFW.glfwWindowHint(GLFW.GLFW_RESIZABLE, GLFW.GLFW_TRUE);
         window = GLFW.glfwCreateWindow(800, 600, "Simple Render", 0, 0);
         if (window == 0) {
             logger.error("Failed to create GLFW window");
@@ -133,7 +144,7 @@ public final class OpenGLRenderer implements MeshUploader {
         }
         GLFW.glfwMakeContextCurrent(window);
         GLFW.glfwSwapInterval(1);
-        GLFW.glfwSetInputMode(window, GLFW.GLFW_CURSOR, GLFW.GLFW_CURSOR_DISABLED);
+        GLFW.glfwSetInputMode(window, GLFW.GLFW_CURSOR, GLFW.GLFW_CURSOR_NORMAL);
         GLFW.glfwShowWindow(window);
         GL.createCapabilities();
         GL11.glEnable(GL11.GL_DEPTH_TEST);
@@ -148,6 +159,21 @@ public final class OpenGLRenderer implements MeshUploader {
         activeShaderName = pendingShaderName;
         initialized = true;
         logger.info("OpenGL context initialized");
+    }
+
+    public void setWindowPosition(int x, int y) {
+        ensureInitialized();
+        requestWindowLayout(x, y, -1, -1);
+    }
+
+    public void setWindowSize(int width, int height) {
+        ensureInitialized();
+        requestWindowLayout(-1, -1, width, height);
+    }
+
+    public void requestWindowLayout(int x, int y, int width, int height) {
+        ensureInitialized();
+        pendingLayout = new WindowLayout(x, y, width, height);
     }
 
     private void applyPendingShader() {
@@ -181,9 +207,74 @@ public final class OpenGLRenderer implements MeshUploader {
         return window;
     }
 
+
+    public <T> CompletableFuture<T> submit(Callable<T> task) {
+        CompletableFuture<T> future = new CompletableFuture<>();
+        Runnable wrapped = () -> {
+            try {
+                future.complete(task.call());
+            } catch (Exception e) {
+                future.completeExceptionally(e);
+            }
+        };
+        if (Thread.currentThread() == renderThread) {
+            wrapped.run();
+        } else {
+            pendingTasks.add(wrapped);
+        }
+        return future;
+    }
+
+    public CompletableFuture<Void> submit(Runnable task) {
+        return submit(() -> {
+            task.run();
+            return null;
+        });
+    }
+
+    private void drainPendingTasks() {
+        Runnable task;
+        while ((task = pendingTasks.poll()) != null) {
+            task.run();
+        }
+    }
+
+    private void applyPendingWindowLayout() {
+        WindowLayout layout = pendingLayout;
+        if (layout == null) {
+            return;
+        }
+        pendingLayout = null;
+        if (layout.hasPosition()) {
+            GLFW.glfwSetWindowPos(window, layout.x(), layout.y());
+        }
+        if (layout.hasSize()) {
+            GLFW.glfwSetWindowSize(window, layout.width(), layout.height());
+        }
+        int[] framebufferWidth = new int[1];
+        int[] framebufferHeight = new int[1];
+        GLFW.glfwGetFramebufferSize(window, framebufferWidth, framebufferHeight);
+        int fbWidth = Math.max(framebufferWidth[0], 1);
+        int fbHeight = Math.max(framebufferHeight[0], 1);
+        GL11.glViewport(0, 0, fbWidth, fbHeight);
+        uniforms.updateProjection((float) fbWidth / (float) fbHeight);
+        shaderProgram.bind();
+        shaderProgram.setUniformMat4("uProjection", uniforms.projectionMatrix());
+    }
+
     private void ensureInitialized() {
         if (!initialized) {
             throw new IllegalStateException("Renderer not initialized");
+        }
+    }
+
+    private record WindowLayout(int x, int y, int width, int height) {
+        boolean hasPosition() {
+            return x >= 0 && y >= 0;
+        }
+
+        boolean hasSize() {
+            return width > 0 && height > 0;
         }
     }
 }
