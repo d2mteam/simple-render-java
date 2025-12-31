@@ -47,16 +47,19 @@ final class GPUMesh {
         indexBuffer.bind();
         float[] positions = snapshot.positions();
         float[] normals = snapshot.normals();
-        int required = positions.length / 3 * 6;
+        float[] texCoords = snapshot.texCoords();
+        int required = positions.length / 3 * 8;
         ensureInterleavedCapacity(required);
-        interleave(positions, normals, interleaved);
+        interleave(positions, normals, texCoords, interleaved);
         vertexBuffer.upload(interleaved, required);
         int[] indexData = snapshot.indices();
         indexBuffer.upload(indexData, indexData.length);
         GL20.glEnableVertexAttribArray(0);
-        GL20.glVertexAttribPointer(0, 3, GL11.GL_FLOAT, false, 6 * Float.BYTES, 0);
+        GL20.glVertexAttribPointer(0, 3, GL11.GL_FLOAT, false, 8 * Float.BYTES, 0);
         GL20.glEnableVertexAttribArray(1);
-        GL20.glVertexAttribPointer(1, 3, GL11.GL_FLOAT, false, 6 * Float.BYTES, 3L * Float.BYTES);
+        GL20.glVertexAttribPointer(1, 3, GL11.GL_FLOAT, false, 8 * Float.BYTES, 3L * Float.BYTES);
+        GL20.glEnableVertexAttribArray(2);
+        GL20.glVertexAttribPointer(2, 2, GL11.GL_FLOAT, false, 8 * Float.BYTES, 6L * Float.BYTES);
         indexCount = indexData.length;
         logger.debug("Uploaded mesh with {} vertices and {} indices", vertexCount, indexCount);
     }
@@ -80,10 +83,11 @@ final class GPUMesh {
         }
     }
 
-    private void interleave(float[] positions, float[] normals, float[] data) {
+    private void interleave(float[] positions, float[] normals, float[] texCoords, float[] data) {
         int vertexCount = positions.length / 3;
         int p = 0;
         int n = 0;
+        int t = 0;
         int d = 0;
         for (int i = 0; i < vertexCount; i++) {
             data[d++] = positions[p++];
@@ -92,6 +96,8 @@ final class GPUMesh {
             data[d++] = normals[n++];
             data[d++] = normals[n++];
             data[d++] = normals[n++];
+            data[d++] = texCoords[t++];
+            data[d++] = texCoords[t++];
         }
     }
 }
