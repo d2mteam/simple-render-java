@@ -30,26 +30,39 @@ public final class Scene {
     private final Camera camera;
     private final CameraController cameraController;
     private final List<RenderableChunk> chunks;
+    private final List<RenderableChunk> importedObjects;
 
-    private Scene(Camera camera, CameraController cameraController, List<RenderableChunk> chunks) {
+    private Scene(
+        Camera camera,
+        CameraController cameraController,
+        List<RenderableChunk> chunks,
+        List<RenderableChunk> importedObjects
+    ) {
         this.camera = camera;
         this.cameraController = cameraController;
         this.chunks = chunks;
+        this.importedObjects = importedObjects;
     }
 
     public static Scene bootstrap(EngineConfig config, MeshUploader meshUploader, Optional<ModelImporter.ImportedModel> importedModel) {
         Camera camera = new Camera();
         CameraController cameraController = new CameraController();
-        List<RenderableChunk> chunks = importedModel
-            .map(model -> new ArrayList<>(List.of(createFromImported(meshUploader, model))))
-            .orElseGet(() -> new ArrayList<>(createRandomChunks(config, meshUploader)));
+        List<RenderableChunk> chunks;
+        List<RenderableChunk> importedObjects;
+        if (importedModel.isPresent()) {
+            chunks = new ArrayList<>();
+            importedObjects = new ArrayList<>(List.of(createFromImported(meshUploader, importedModel.get())));
+        } else {
+            chunks = new ArrayList<>(createRandomChunks(config, meshUploader));
+            importedObjects = new ArrayList<>();
+        }
         if (importedModel.isPresent()) {
             logger.info("Scene bootstrapped with imported model");
         } else {
             logger.info("Scene bootstrapped with default chunks");
         }
-        logger.info("Scene bootstrapped with {} chunks", chunks.size());
-        return new Scene(camera, cameraController, chunks);
+        logger.info("Scene bootstrapped with {} chunks and {} imported objects", chunks.size(), importedObjects.size());
+        return new Scene(camera, cameraController, chunks, importedObjects);
     }
 
     public void update(Time time) {
@@ -61,9 +74,13 @@ public final class Scene {
     }
 
     public SceneSnapshot snapshot() {
-        RenderItem[] snapshots = new RenderItem[chunks.size()];
-        for (int i = 0; i < chunks.size(); i++) {
-            snapshots[i] = chunks.get(i).snapshot();
+        RenderItem[] snapshots = new RenderItem[chunks.size() + importedObjects.size()];
+        int index = 0;
+        for (RenderableChunk chunk : chunks) {
+            snapshots[index++] = chunk.snapshot();
+        }
+        for (RenderableChunk importedObject : importedObjects) {
+            snapshots[index++] = importedObject.snapshot();
         }
         return new SceneSnapshot(camera.snapshot(), snapshots);
     }
@@ -73,28 +90,32 @@ public final class Scene {
     }
 
     public void updateTransform(int index, float x, float y, float z, float scale) {
-        if (chunks.isEmpty()) {
+        if (chunks.isEmpty() && importedObjects.isEmpty()) {
             logger.warn("No renderable chunks available to update transform");
             return;
         }
-        if (index < 0 || index >= chunks.size()) {
-            logger.warn("Transform index {} out of range (count={})", index, chunks.size());
+        if (index < 0 || index >= objectCount()) {
+            logger.warn("Transform index {} out of range (count={})", index, objectCount());
             return;
         }
-        chunks.get(index).updateTransform(x, y, z, scale);
+        if (index < chunks.size()) {
+            chunks.get(index).updateTransform(x, y, z, scale);
+        } else {
+            importedObjects.get(index - chunks.size()).updateTransform(x, y, z, scale);
+        }
         logger.info("Updated object {} transform to ({}, {}, {}) scale {}", index, x, y, z, scale);
     }
 
     public int addImportedObject(MeshUploader meshUploader, ModelImporter.ImportedModel model) {
         RenderableChunk chunk = createFromImported(meshUploader, model);
-        chunks.add(chunk);
-        int index = chunks.size() - 1;
+        importedObjects.add(chunk);
+        int index = chunks.size() + importedObjects.size() - 1;
         logger.info("Added imported object at index {}", index);
         return index;
     }
 
     public int objectCount() {
-        return chunks.size();
+        return chunks.size() + importedObjects.size();
     }
 
     private static List<RenderableChunk> createRandomChunks(EngineConfig config, MeshUploader meshUploader) {
