@@ -1,5 +1,6 @@
 #version 330 core
 in vec3 vNormal;
+in vec2 vTexCoord;
 uniform vec3 uLightDir;
 uniform vec3 uBaseColor;
 uniform sampler2D uTexture;
@@ -26,7 +27,7 @@ void main() {
     float viewScatter = mix(1.0, fd90, schlickWeight(ndotv));
     float disneyDiffuse = lightScatter * viewScatter;
 
-    vec3 base = uBaseColor * texture(uTexture, vec2(0.5, 0.5)).rgb;
+    vec3 base = uBaseColor * texture(uTexture, vTexCoord).rgb;
     vec3 color = base * (0.2 + disneyDiffuse * ndotl * 0.8);
     FragColor = vec4(color, 1.0);
 }

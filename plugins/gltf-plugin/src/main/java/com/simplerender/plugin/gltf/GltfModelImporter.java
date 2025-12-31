@@ -60,7 +60,12 @@ public final class GltfModelImporter implements ModelImporter {
                 }
             }
 
-            MeshData meshData = new MeshData(meshParts.positions(), meshParts.normals(), meshParts.indices());
+            MeshData meshData = new MeshData(
+                meshParts.positions(),
+                meshParts.normals(),
+                meshParts.texCoords(),
+                meshParts.indices()
+            );
             MaterialData materialData = new MaterialData(baseColor, textureData);
             return new ImportedModel(meshData, materialData);
         } catch (Exception e) {
@@ -151,16 +156,20 @@ public final class GltfModelImporter implements ModelImporter {
             JsonObject attributes = primitive.getAsJsonObject("attributes");
             int positionAccessorIndex = attributes.get("POSITION").getAsInt();
             int normalAccessorIndex = attributes.has("NORMAL") ? attributes.get("NORMAL").getAsInt() : -1;
+            int texCoordAccessorIndex = attributes.has("TEXCOORD_0") ? attributes.get("TEXCOORD_0").getAsInt() : -1;
             int indexAccessorIndex = primitive.has("indices") ? primitive.get("indices").getAsInt() : -1;
             float[] positions = readFloatVec3(accessors, bufferViews, bufferBytes, positionAccessorIndex);
             float[] normals = normalAccessorIndex >= 0
                 ? readFloatVec3(accessors, bufferViews, bufferBytes, normalAccessorIndex)
                 : defaultNormals(positions.length / 3);
+            float[] texCoords = texCoordAccessorIndex >= 0
+                ? readFloatVec2(accessors, bufferViews, bufferBytes, texCoordAccessorIndex)
+                : null;
             applyTransform(positions, normals, transform);
             int[] indices = indexAccessorIndex >= 0
                 ? readIndices(accessors, bufferViews, bufferBytes, indexAccessorIndex)
                 : sequentialIndices(positions.length / 3);
-            combined.append(positions, normals, indices);
+            combined.append(positions, normals, texCoords, indices);
         }
     }
 
@@ -405,6 +414,26 @@ public final class GltfModelImporter implements ModelImporter {
         return values;
     }
 
+    private float[] readFloatVec2(JsonArray accessors, JsonArray bufferViews, byte[] bufferBytes, int accessorIndex) {
+        JsonObject accessor = accessors.get(accessorIndex).getAsJsonObject();
+        int count = accessor.get("count").getAsInt();
+        int bufferViewIndex = accessor.get("bufferView").getAsInt();
+        int byteOffset = accessor.has("byteOffset") ? accessor.get("byteOffset").getAsInt() : 0;
+
+        JsonObject bufferView = bufferViews.get(bufferViewIndex).getAsJsonObject();
+        int viewOffset = bufferView.has("byteOffset") ? bufferView.get("byteOffset").getAsInt() : 0;
+        int stride = bufferView.has("byteStride") ? bufferView.get("byteStride").getAsInt() : 8;
+
+        ByteBuffer buffer = ByteBuffer.wrap(bufferBytes).order(ByteOrder.LITTLE_ENDIAN);
+        float[] values = new float[count * 2];
+        for (int i = 0; i < count; i++) {
+            int base = viewOffset + byteOffset + i * stride;
+            values[i * 2] = buffer.getFloat(base);
+            values[i * 2 + 1] = buffer.getFloat(base + 4);
+        }
+        return values;
+    }
+
     private int[] readIndices(JsonArray accessors, JsonArray bufferViews, byte[] bufferBytes, int accessorIndex) {
         JsonObject accessor = accessors.get(accessorIndex).getAsJsonObject();
         int count = accessor.get("count").getAsInt();
@@ -458,6 +487,7 @@ public final class GltfModelImporter implements ModelImporter {
     private static final class MeshParts {
         private float[] positions;
         private float[] normals;
+        private float[] texCoords;
         private int[] indices;
         private int vertexCount;
         private int indexCount;
@@ -478,11 +508,15 @@ public final class GltfModelImporter implements ModelImporter {
             return normals == null ? new float[0] : Arrays.copyOf(normals, vertexCount * 3);
         }
 
+        float[] texCoords() {
+            return texCoords == null ? new float[0] : Arrays.copyOf(texCoords, vertexCount * 2);
+        }
+
         int[] indices() {
             return indices == null ? new int[0] : Arrays.copyOf(indices, indexCount);
         }
 
-        void append(float[] newPositions, float[] newNormals, int[] newIndices) {
+        void append(float[] newPositions, float[] newNormals, float[] newTexCoords, int[] newIndices) {
             int newVertices = newPositions.length / 3;
             ensureVertexCapacity(vertexCount + newVertices);
             System.arraycopy(newPositions, 0, positions, vertexCount * 3, newPositions.length);
@@ -494,6 +528,16 @@ public final class GltfModelImporter implements ModelImporter {
             } else {
                 float[] fallback = defaultNormals(newVertices);
                 System.arraycopy(fallback, 0, normals, vertexCount * 3, fallback.length);
+            }
+            ensureTexCoordCapacity(vertexCount + newVertices);
+            if (newTexCoords != null && newTexCoords.length == newVertices * 2) {
+                System.arraycopy(newTexCoords, 0, texCoords, vertexCount * 2, newTexCoords.length);
+            } else {
+                for (int i = 0; i < newVertices; i++) {
+                    int base = (vertexCount + i) * 2;
+                    texCoords[base] = 0.5f;
+                    texCoords[base + 1] = 0.5f;
+                }
             }
             ensureIndexCapacity(indexCount + newIndices.length);
             for (int i = 0; i < newIndices.length; i++) {
@@ -514,6 +558,18 @@ public final class GltfModelImporter implements ModelImporter {
                 int newLength = Math.max(requiredLength, positions.length * 2);
                 positions = Arrays.copyOf(positions, newLength);
                 normals = Arrays.copyOf(normals, newLength);
+            }
+        }
+
+        private void ensureTexCoordCapacity(int requiredVertices) {
+            int requiredLength = requiredVertices * 2;
+            if (texCoords == null) {
+                texCoords = new float[requiredLength];
+                return;
+            }
+            if (texCoords.length < requiredLength) {
+                int newLength = Math.max(requiredLength, texCoords.length * 2);
+                texCoords = Arrays.copyOf(texCoords, newLength);
             }
         }
 

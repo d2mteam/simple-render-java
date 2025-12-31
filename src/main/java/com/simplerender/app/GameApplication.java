@@ -20,7 +20,7 @@ public final class GameApplication {
 
     public GameApplication(EngineConfig config) {
         this.config = config;
-        this.renderer = new OpenGLRenderer(config.chunkCount());
+        this.renderer = new OpenGLRenderer();
         this.inputAdapter = new JavaFxInputAdapter();
         if (config.shaderName() != null && !config.shaderName().isBlank()) {
             this.renderer.requestShader(config.shaderName());
@@ -37,9 +37,9 @@ public final class GameApplication {
         if (importedModel.isPresent()) {
             logger.info("Imported model ready for rendering");
         } else {
-            logger.info("No model selected; using default chunks");
+            logger.info("No model selected; scene will start empty");
         }
-        this.scene = Scene.bootstrap(config, renderer, importedModel);
+        this.scene = Scene.bootstrap(renderer, importedModel);
         RenderControlPanel.launch(scene, renderer, importService, inputAdapter);
         this.gameLoop = new GameLoop(config, new Time(), scene, renderer, inputAdapter);
     }
