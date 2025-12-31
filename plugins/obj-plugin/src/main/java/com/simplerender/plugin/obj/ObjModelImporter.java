@@ -26,8 +26,9 @@ public final class ObjModelImporter implements ModelImporter {
         ObjData objData = parseObj(path);
         float[] positions = objData.positions();
         float[] normals = objData.normals();
+        float[] texCoords = objData.texCoords();
         int[] indices = objData.indices();
-        MeshData meshData = new MeshData(positions, normals, indices);
+        MeshData meshData = new MeshData(positions, normals, texCoords, indices);
         MaterialData materialData = buildMaterial(path, objData.materialLibrary(), objData.materialName());
         return new ImportedModel(meshData, materialData);
     }
@@ -35,8 +36,11 @@ public final class ObjModelImporter implements ModelImporter {
     private ObjData parseObj(Path path) {
         List<float[]> vertices = new ArrayList<>();
         List<float[]> normals = new ArrayList<>();
-        List<Integer> indices = new ArrayList<>();
+        List<float[]> texCoords = new ArrayList<>();
+        List<float[]> finalPositions = new ArrayList<>();
         List<float[]> finalNormals = new ArrayList<>();
+        List<float[]> finalTexCoords = new ArrayList<>();
+        List<Integer> indices = new ArrayList<>();
         String materialLibrary = null;
         String materialName = null;
 
@@ -49,27 +53,30 @@ public final class ObjModelImporter implements ModelImporter {
                 String[] tokens = trimmed.split("\\s+");
                 switch (tokens[0]) {
                     case "v" -> vertices.add(parseVec3(tokens));
+                    case "vt" -> texCoords.add(parseVec2(tokens));
                     case "vn" -> normals.add(parseVec3(tokens));
                     case "f" -> {
                         if (tokens.length < 4) {
                             continue;
                         }
-                        int[] faceIndices = new int[3];
-                        float[][] faceNormals = new float[3][];
                         for (int i = 0; i < 3; i++) {
                             String[] parts = tokens[i + 1].split("/");
-                            int vertexIndex = Integer.parseInt(parts[0]) - 1;
-                            faceIndices[i] = vertexIndex;
-                            if (parts.length >= 3 && !parts[2].isEmpty()) {
-                                int normalIndex = Integer.parseInt(parts[2]) - 1;
-                                if (normalIndex >= 0 && normalIndex < normals.size()) {
-                                    faceNormals[i] = normals.get(normalIndex);
-                                }
-                            }
-                        }
-                        for (int i = 0; i < 3; i++) {
-                            indices.add(faceIndices[i]);
-                            finalNormals.add(faceNormals[i]);
+                            int vertexIndex = parseIndex(parts, 0) - 1;
+                            int texCoordIndex = parseIndex(parts, 1) - 1;
+                            int normalIndex = parseIndex(parts, 2) - 1;
+                            float[] position = (vertexIndex >= 0 && vertexIndex < vertices.size())
+                                ? vertices.get(vertexIndex)
+                                : new float[] {0.0f, 0.0f, 0.0f};
+                            float[] normal = (normalIndex >= 0 && normalIndex < normals.size())
+                                ? normals.get(normalIndex)
+                                : new float[] {0.0f, 1.0f, 0.0f};
+                            float[] texCoord = (texCoordIndex >= 0 && texCoordIndex < texCoords.size())
+                                ? texCoords.get(texCoordIndex)
+                                : new float[] {0.5f, 0.5f};
+                            finalPositions.add(position);
+                            finalNormals.add(normal);
+                            finalTexCoords.add(texCoord);
+                            indices.add(finalPositions.size() - 1);
                         }
                     }
                     case "mtllib" -> materialLibrary = tokens.length > 1 ? tokens[1] : null;
@@ -82,30 +89,31 @@ public final class ObjModelImporter implements ModelImporter {
             throw new IllegalStateException("Failed to read OBJ: " + path, e);
         }
 
-        float[] positionArray = new float[vertices.size() * 3];
-        for (int i = 0; i < vertices.size(); i++) {
-            float[] v = vertices.get(i);
+        float[] positionArray = new float[finalPositions.size() * 3];
+        for (int i = 0; i < finalPositions.size(); i++) {
+            float[] v = finalPositions.get(i);
             int base = i * 3;
             positionArray[base] = v[0];
             positionArray[base + 1] = v[1];
             positionArray[base + 2] = v[2];
         }
-        float[] normalArray = new float[vertices.size() * 3];
-        for (int i = 0; i < vertices.size(); i++) {
+        float[] normalArray = new float[finalNormals.size() * 3];
+        for (int i = 0; i < finalNormals.size(); i++) {
+            float[] n = finalNormals.get(i);
             int base = i * 3;
-            float[] n = (i < finalNormals.size()) ? finalNormals.get(i) : null;
-            if (n == null) {
-                normalArray[base] = 0.0f;
-                normalArray[base + 1] = 1.0f;
-                normalArray[base + 2] = 0.0f;
-            } else {
-                normalArray[base] = n[0];
-                normalArray[base + 1] = n[1];
-                normalArray[base + 2] = n[2];
-            }
+            normalArray[base] = n[0];
+            normalArray[base + 1] = n[1];
+            normalArray[base + 2] = n[2];
+        }
+        float[] texCoordArray = new float[finalTexCoords.size() * 2];
+        for (int i = 0; i < finalTexCoords.size(); i++) {
+            float[] t = finalTexCoords.get(i);
+            int base = i * 2;
+            texCoordArray[base] = t[0];
+            texCoordArray[base + 1] = t[1];
         }
         int[] indexArray = indices.stream().mapToInt(Integer::intValue).toArray();
-        return new ObjData(positionArray, normalArray, indexArray, materialLibrary, materialName);
+        return new ObjData(positionArray, normalArray, texCoordArray, indexArray, materialLibrary, materialName);
     }
 
     private MaterialData buildMaterial(Path objPath, String materialLibrary, String materialName) {
@@ -183,6 +191,27 @@ public final class ObjModelImporter implements ModelImporter {
         };
     }
 
-    private record ObjData(float[] positions, float[] normals, int[] indices, String materialLibrary, String materialName) {
+    private float[] parseVec2(String[] tokens) {
+        return new float[] {
+            Float.parseFloat(tokens[1]),
+            1.0f - Float.parseFloat(tokens[2])
+        };
+    }
+
+    private int parseIndex(String[] parts, int index) {
+        if (parts.length <= index || parts[index].isBlank()) {
+            return 0;
+        }
+        return Integer.parseInt(parts[index]);
+    }
+
+    private record ObjData(
+        float[] positions,
+        float[] normals,
+        float[] texCoords,
+        int[] indices,
+        String materialLibrary,
+        String materialName
+    ) {
     }
 }
