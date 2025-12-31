@@ -14,6 +14,10 @@ import com.simplerender.render.TextureHandle;
 import com.simplerender.render.culling.FrustumCuller;
 import com.simplerender.render.pipeline.RenderPipeline;
 import com.simplerender.scene.SceneSnapshot;
+import java.util.Queue;
+import java.util.concurrent.Callable;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import org.lwjgl.glfw.GLFW;
 import org.lwjgl.opengl.GL;
 import org.lwjgl.opengl.GL11;
@@ -32,6 +36,8 @@ public final class OpenGLRenderer implements MeshUploader {
     private String pendingShaderName;
     private String activeShaderName;
     private long window;
+    private final Queue<Runnable> pendingTasks = new ConcurrentLinkedQueue<>();
+    private Thread renderThread;
 
     public OpenGLRenderer(int chunkCount) {
         this(chunkCount, "default");
@@ -49,6 +55,7 @@ public final class OpenGLRenderer implements MeshUploader {
 
     public void render(SceneSnapshot snapshot) {
         ensureInitialized();
+        drainPendingTasks();
         applyPendingShader();
         if (!pipeline.shouldRender(snapshot.camera())) {
             return;
@@ -120,12 +127,14 @@ public final class OpenGLRenderer implements MeshUploader {
         if (initialized) {
             return;
         }
+        renderThread = Thread.currentThread();
         if (!GLFW.glfwInit()) {
             logger.error("Failed to initialize GLFW");
             throw new IllegalStateException("GLFW init failed");
         }
         GLFW.glfwWindowHint(GLFW.GLFW_VISIBLE, GLFW.GLFW_FALSE);
-        GLFW.glfwWindowHint(GLFW.GLFW_RESIZABLE, GLFW.GLFW_FALSE);
+        GLFW.glfwWindowHint(GLFW.GLFW_DECORATED, GLFW.GLFW_FALSE);
+        GLFW.glfwWindowHint(GLFW.GLFW_RESIZABLE, GLFW.GLFW_TRUE);
         window = GLFW.glfwCreateWindow(800, 600, "Simple Render", 0, 0);
         if (window == 0) {
             logger.error("Failed to create GLFW window");
@@ -133,7 +142,7 @@ public final class OpenGLRenderer implements MeshUploader {
         }
         GLFW.glfwMakeContextCurrent(window);
         GLFW.glfwSwapInterval(1);
-        GLFW.glfwSetInputMode(window, GLFW.GLFW_CURSOR, GLFW.GLFW_CURSOR_DISABLED);
+        GLFW.glfwSetInputMode(window, GLFW.GLFW_CURSOR, GLFW.GLFW_CURSOR_NORMAL);
         GLFW.glfwShowWindow(window);
         GL.createCapabilities();
         GL11.glEnable(GL11.GL_DEPTH_TEST);
@@ -148,6 +157,39 @@ public final class OpenGLRenderer implements MeshUploader {
         activeShaderName = pendingShaderName;
         initialized = true;
         logger.info("OpenGL context initialized");
+    }
+
+    public void setWindowPosition(int x, int y) {
+        ensureInitialized();
+        if (Thread.currentThread() != renderThread) {
+            submit(() -> setWindowPositionInternal(x, y));
+            return;
+        }
+        setWindowPositionInternal(x, y);
+    }
+
+    public void setWindowSize(int width, int height) {
+        ensureInitialized();
+        if (Thread.currentThread() != renderThread) {
+            submit(() -> setWindowSizeInternal(width, height));
+            return;
+        }
+        setWindowSizeInternal(width, height);
+    }
+
+    private void setWindowPositionInternal(int x, int y) {
+        GLFW.glfwSetWindowPos(window, x, y);
+    }
+
+    private void setWindowSizeInternal(int width, int height) {
+        if (width <= 0 || height <= 0) {
+            return;
+        }
+        GLFW.glfwSetWindowSize(window, width, height);
+        GL11.glViewport(0, 0, width, height);
+        uniforms.updateProjection((float) width / (float) height);
+        shaderProgram.bind();
+        shaderProgram.setUniformMat4("uProjection", uniforms.projectionMatrix());
     }
 
     private void applyPendingShader() {
@@ -179,6 +221,38 @@ public final class OpenGLRenderer implements MeshUploader {
     public long windowHandle() {
         ensureInitialized();
         return window;
+    }
+
+
+    public <T> CompletableFuture<T> submit(Callable<T> task) {
+        CompletableFuture<T> future = new CompletableFuture<>();
+        Runnable wrapped = () -> {
+            try {
+                future.complete(task.call());
+            } catch (Exception e) {
+                future.completeExceptionally(e);
+            }
+        };
+        if (Thread.currentThread() == renderThread) {
+            wrapped.run();
+        } else {
+            pendingTasks.add(wrapped);
+        }
+        return future;
+    }
+
+    public CompletableFuture<Void> submit(Runnable task) {
+        return submit(() -> {
+            task.run();
+            return null;
+        });
+    }
+
+    private void drainPendingTasks() {
+        Runnable task;
+        while ((task = pendingTasks.poll()) != null) {
+            task.run();
+        }
     }
 
     private void ensureInitialized() {
