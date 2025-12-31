@@ -6,13 +6,19 @@ import java.util.Arrays;
 public final class MeshData {
     private final float[] positions;
     private final float[] normals;
+    private final float[] texCoords;
     private final int[] indices;
     private final Vector3f boundsCenter;
     private final float boundsRadius;
 
     public MeshData(float[] positions, float[] normals, int[] indices) {
+        this(positions, normals, null, indices);
+    }
+
+    public MeshData(float[] positions, float[] normals, float[] texCoords, int[] indices) {
         this.positions = Arrays.copyOf(positions, positions.length);
         this.normals = Arrays.copyOf(normals, normals.length);
+        this.texCoords = buildTexCoords(texCoords, this.positions.length / 3);
         this.indices = Arrays.copyOf(indices, indices.length);
         Vector3f center = computeBoundsCenter(this.positions);
         this.boundsCenter = center;
@@ -25,6 +31,10 @@ public final class MeshData {
 
     public float[] normals() {
         return Arrays.copyOf(normals, normals.length);
+    }
+
+    public float[] texCoords() {
+        return Arrays.copyOf(texCoords, texCoords.length);
     }
 
     public int[] indices() {
@@ -98,5 +108,19 @@ public final class MeshData {
             }
         }
         return (float) Math.sqrt(maxDistanceSq);
+    }
+
+    private static float[] buildTexCoords(float[] texCoords, int vertexCount) {
+        int expectedLength = vertexCount * 2;
+        if (texCoords == null || texCoords.length != expectedLength) {
+            float[] fallback = new float[expectedLength];
+            for (int i = 0; i < vertexCount; i++) {
+                int base = i * 2;
+                fallback[base] = 0.5f;
+                fallback[base + 1] = 0.5f;
+            }
+            return fallback;
+        }
+        return Arrays.copyOf(texCoords, texCoords.length);
     }
 }
