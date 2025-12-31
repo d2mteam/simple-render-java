@@ -36,7 +36,6 @@ public final class GameLoop {
             renderer.pollEvents();
             scene.update(time, inputReader.readInput(renderer.windowHandle()));
             renderer.render(scene.snapshot());
-            logger.debug("Completed frame {}", frame);
             frame++;
         }
         logger.info("Game loop completed after {} frames", frame);

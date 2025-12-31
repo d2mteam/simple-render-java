@@ -41,8 +41,8 @@ public final class Scene {
         Camera camera = new Camera();
         CameraController cameraController = new CameraController();
         List<RenderableChunk> chunks = importedModel
-            .map(model -> List.of(createFromImported(meshUploader, model)))
-            .orElseGet(() -> createRandomChunks(config, meshUploader));
+            .map(model -> new ArrayList<>(List.of(createFromImported(meshUploader, model))))
+            .orElseGet(() -> new ArrayList<>(createRandomChunks(config, meshUploader)));
         if (importedModel.isPresent()) {
             logger.info("Scene bootstrapped with imported model");
         } else {
@@ -65,7 +65,6 @@ public final class Scene {
         for (int i = 0; i < chunks.size(); i++) {
             snapshots[i] = chunks.get(i).snapshot();
         }
-        logger.debug("Scene snapshot created for {} chunks", snapshots.length);
         return new SceneSnapshot(camera.snapshot(), snapshots);
     }
 
