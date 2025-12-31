@@ -7,8 +7,11 @@ uniform mat4 uView;
 uniform mat4 uModel;
 out vec3 vNormal;
 out vec2 vTexCoord;
+out vec3 vWorldPos;
 void main() {
-    vNormal = aNormal;
+    vec4 worldPos = uModel * vec4(aPos, 1.0);
+    vWorldPos = worldPos.xyz;
+    vNormal = mat3(uModel) * aNormal;
     vTexCoord = aTexCoord;
-    gl_Position = uProjection * uView * uModel * vec4(aPos, 1.0);
+    gl_Position = uProjection * uView * worldPos;
 }

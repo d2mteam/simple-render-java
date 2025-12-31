@@ -176,7 +176,13 @@ public final class OpenGLRenderer implements MeshUploader {
         GL11.glEnable(GL11.GL_DEPTH_TEST);
         GL11.glClearColor(0.12f, 0.12f, 0.12f, 1.0f);
         uniforms = new RenderUniforms(1.0f);
-        resourceManager.initDefaultTexture(TextureDataFactory.checkerboard(2, 1));
+        resourceManager.initDefaultTextures(
+            TextureDataFactory.solidColor(255, 255, 255, 255),
+            TextureDataFactory.solidColor(128, 128, 255, 255),
+            TextureDataFactory.solidColor(0, 255, 0, 255),
+            TextureDataFactory.solidColor(255, 255, 255, 255),
+            TextureDataFactory.solidColor(0, 0, 0, 255)
+        );
         ShaderSource shaderSource = ShaderSourceLoader.loadByName(pendingShaderName);
         shaderProgram.init(shaderSource.vertexSource(), shaderSource.fragmentSource());
         shaderProgram.bind();

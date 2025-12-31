@@ -22,7 +22,11 @@ final class GpuResourceManager {
     private final Map<MeshHandle, GPUMesh> meshes = new HashMap<>();
     private final Map<MaterialHandle, GpuMaterial> materials = new HashMap<>();
     private final Map<TextureHandle, GpuTexture> textures = new HashMap<>();
-    private TextureHandle defaultTexture;
+    private TextureHandle defaultBaseColorTexture;
+    private TextureHandle defaultNormalTexture;
+    private TextureHandle defaultMetallicRoughnessTexture;
+    private TextureHandle defaultAoTexture;
+    private TextureHandle defaultEmissiveTexture;
 
     public MeshHandle uploadMesh(MeshData meshData) {
         MeshHandle handle = new MeshHandle(meshId.incrementAndGet());
@@ -34,11 +38,14 @@ final class GpuResourceManager {
     }
 
     public MaterialHandle uploadMaterial(MaterialData materialData) {
-        TextureHandle baseColorHandle = resolveTexture(materialData.baseColorTexture());
-        TextureHandle normalHandle = resolveTexture(materialData.normalTexture());
-        TextureHandle metallicRoughnessHandle = resolveTexture(materialData.metallicRoughnessTexture());
-        TextureHandle aoHandle = resolveTexture(materialData.aoTexture());
-        TextureHandle emissiveHandle = resolveTexture(materialData.emissiveTexture());
+        TextureHandle baseColorHandle = resolveTexture(materialData.baseColorTexture(), defaultBaseColorTexture);
+        TextureHandle normalHandle = resolveTexture(materialData.normalTexture(), defaultNormalTexture);
+        TextureHandle metallicRoughnessHandle = resolveTexture(
+            materialData.metallicRoughnessTexture(),
+            defaultMetallicRoughnessTexture
+        );
+        TextureHandle aoHandle = resolveTexture(materialData.aoTexture(), defaultAoTexture);
+        TextureHandle emissiveHandle = resolveTexture(materialData.emissiveTexture(), defaultEmissiveTexture);
         MaterialHandle handle = new MaterialHandle(materialId.incrementAndGet());
         materials.put(handle, new GpuMaterial(
             materialData.baseColor(),
@@ -59,9 +66,27 @@ final class GpuResourceManager {
         return handle;
     }
 
-    public void initDefaultTexture(TextureData textureData) {
-        if (defaultTexture == null) {
-            defaultTexture = uploadTexture(textureData);
+    public void initDefaultTextures(
+        TextureData baseColorTexture,
+        TextureData normalTexture,
+        TextureData metallicRoughnessTexture,
+        TextureData aoTexture,
+        TextureData emissiveTexture
+    ) {
+        if (defaultBaseColorTexture == null) {
+            defaultBaseColorTexture = uploadTexture(baseColorTexture);
+        }
+        if (defaultNormalTexture == null) {
+            defaultNormalTexture = uploadTexture(normalTexture);
+        }
+        if (defaultMetallicRoughnessTexture == null) {
+            defaultMetallicRoughnessTexture = uploadTexture(metallicRoughnessTexture);
+        }
+        if (defaultAoTexture == null) {
+            defaultAoTexture = uploadTexture(aoTexture);
+        }
+        if (defaultEmissiveTexture == null) {
+            defaultEmissiveTexture = uploadTexture(emissiveTexture);
         }
     }
 
@@ -78,11 +103,11 @@ final class GpuResourceManager {
     }
 
     public GpuTexture defaultTexture() {
-        return textures.get(defaultTexture);
+        return textures.get(defaultBaseColorTexture);
     }
 
-    private TextureHandle resolveTexture(java.util.Optional<TextureData> textureData) {
-        return textureData.map(this::uploadTexture).orElse(defaultTexture);
+    private TextureHandle resolveTexture(java.util.Optional<TextureData> textureData, TextureHandle fallback) {
+        return textureData.map(this::uploadTexture).orElse(fallback);
     }
 
     record GpuMaterial(

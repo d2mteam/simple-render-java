@@ -43,7 +43,11 @@ public final class GltfModelImporter implements ModelImporter {
             MeshParts meshParts = readSceneMeshes(root, accessors, bufferViews, bufferBytes);
 
             float[] baseColor = new float[] {0.8f, 0.8f, 0.8f};
-            TextureData textureData = null;
+            TextureData baseColorTexture = null;
+            TextureData normalTexture = null;
+            TextureData metallicRoughnessTexture = null;
+            TextureData aoTexture = null;
+            TextureData emissiveTexture = null;
             if (root.has("materials")) {
                 JsonObject material = root.getAsJsonArray("materials").get(0).getAsJsonObject();
                 if (material.has("pbrMetallicRoughness")) {
@@ -56,7 +60,26 @@ public final class GltfModelImporter implements ModelImporter {
                             color.get(2).getAsFloat()
                         };
                     }
-                    textureData = loadBaseColorTexture(pbr, root, bufferBytes, path.getParent());
+                    if (pbr.has("baseColorTexture")) {
+                        int textureIndex = pbr.getAsJsonObject("baseColorTexture").get("index").getAsInt();
+                        baseColorTexture = loadTextureByIndex(textureIndex, root, bufferBytes, path.getParent());
+                    }
+                    if (pbr.has("metallicRoughnessTexture")) {
+                        int textureIndex = pbr.getAsJsonObject("metallicRoughnessTexture").get("index").getAsInt();
+                        metallicRoughnessTexture = loadTextureByIndex(textureIndex, root, bufferBytes, path.getParent());
+                    }
+                }
+                if (material.has("normalTexture")) {
+                    int textureIndex = material.getAsJsonObject("normalTexture").get("index").getAsInt();
+                    normalTexture = loadTextureByIndex(textureIndex, root, bufferBytes, path.getParent());
+                }
+                if (material.has("occlusionTexture")) {
+                    int textureIndex = material.getAsJsonObject("occlusionTexture").get("index").getAsInt();
+                    aoTexture = loadTextureByIndex(textureIndex, root, bufferBytes, path.getParent());
+                }
+                if (material.has("emissiveTexture")) {
+                    int textureIndex = material.getAsJsonObject("emissiveTexture").get("index").getAsInt();
+                    emissiveTexture = loadTextureByIndex(textureIndex, root, bufferBytes, path.getParent());
                 }
             }
 
@@ -66,7 +89,14 @@ public final class GltfModelImporter implements ModelImporter {
                 meshParts.texCoords(),
                 meshParts.indices()
             );
-            MaterialData materialData = new MaterialData(baseColor, textureData);
+            MaterialData materialData = new MaterialData(
+                baseColor,
+                baseColorTexture,
+                normalTexture,
+                metallicRoughnessTexture,
+                aoTexture,
+                emissiveTexture
+            );
             return new ImportedModel(meshData, materialData);
         } catch (Exception e) {
             throw new IllegalStateException("Failed to import glTF: " + path, e);
@@ -315,20 +345,11 @@ public final class GltfModelImporter implements ModelImporter {
         return Files.readAllBytes(base.resolve(uri));
     }
 
-    private TextureData loadBaseColorTexture(
-        JsonObject pbr,
-        JsonObject root,
-        byte[] bufferBytes,
-        Path baseDir
-    ) {
-        if (!pbr.has("baseColorTexture")) {
-            return null;
-        }
+    private TextureData loadTextureByIndex(int textureIndex, JsonObject root, byte[] bufferBytes, Path baseDir) {
         if (!root.has("textures") || !root.has("images")) {
             logger.warn("glTF texture referenced but textures/images arrays are missing");
             return null;
         }
-        int textureIndex = pbr.getAsJsonObject("baseColorTexture").get("index").getAsInt();
         JsonObject texture = root.getAsJsonArray("textures").get(textureIndex).getAsJsonObject();
         if (!texture.has("source")) {
             logger.warn("glTF texture {} has no source index", textureIndex);
