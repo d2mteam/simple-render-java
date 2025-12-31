@@ -161,11 +161,27 @@ public final class OpenGLRenderer implements MeshUploader {
 
     public void setWindowPosition(int x, int y) {
         ensureInitialized();
-        GLFW.glfwSetWindowPos(window, x, y);
+        if (Thread.currentThread() != renderThread) {
+            submit(() -> setWindowPositionInternal(x, y));
+            return;
+        }
+        setWindowPositionInternal(x, y);
     }
 
     public void setWindowSize(int width, int height) {
         ensureInitialized();
+        if (Thread.currentThread() != renderThread) {
+            submit(() -> setWindowSizeInternal(width, height));
+            return;
+        }
+        setWindowSizeInternal(width, height);
+    }
+
+    private void setWindowPositionInternal(int x, int y) {
+        GLFW.glfwSetWindowPos(window, x, y);
+    }
+
+    private void setWindowSizeInternal(int width, int height) {
         if (width <= 0 || height <= 0) {
             return;
         }
@@ -222,6 +238,13 @@ public final class OpenGLRenderer implements MeshUploader {
             pendingTasks.add(wrapped);
         }
         return future;
+    }
+
+    public CompletableFuture<Void> submit(Runnable task) {
+        return submit(() -> {
+            task.run();
+            return null;
+        });
     }
 
     private void drainPendingTasks() {
