@@ -18,9 +18,7 @@ public final class Main {
             config = config.withShaderName(shaderName);
         }
         logger.info(
-            "Starting Simple Render with {} chunks (seed={}, shader={})",
-            config.chunkCount(),
-            config.randomSeed(),
+            "Starting Simple Render (shader={})",
             config.shaderName()
         );
         GameApplication application = new GameApplication(config);
