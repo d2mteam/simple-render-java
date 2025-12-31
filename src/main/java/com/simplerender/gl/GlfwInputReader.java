@@ -10,7 +10,7 @@ public final class GlfwInputReader {
     private final double[] cursorPosX = new double[1];
     private final double[] cursorPosY = new double[1];
 
-    public InputState readInput(long window) {
+    public InputState readInput(long window, boolean allowLook) {
         boolean forward = GLFW.glfwGetKey(window, GLFW.GLFW_KEY_W) == GLFW.GLFW_PRESS;
         boolean backward = GLFW.glfwGetKey(window, GLFW.GLFW_KEY_S) == GLFW.GLFW_PRESS;
         boolean left = GLFW.glfwGetKey(window, GLFW.GLFW_KEY_A) == GLFW.GLFW_PRESS;

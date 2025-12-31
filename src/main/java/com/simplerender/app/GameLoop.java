@@ -34,7 +34,7 @@ public final class GameLoop {
         while (!renderer.shouldClose()) {
             time.update();
             renderer.pollEvents();
-            scene.update(time, inputReader.readInput(renderer.windowHandle()));
+            scene.update(time, inputReader.readInput(renderer.windowHandle(), renderer.isCursorInside()));
             renderer.render(scene.snapshot());
             frame++;
         }
