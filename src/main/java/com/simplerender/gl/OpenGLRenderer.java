@@ -53,18 +53,18 @@ public final class OpenGLRenderer implements MeshUploader {
     private int renderHeight = 1;
     private ByteBuffer pixelBuffer;
 
-    public OpenGLRenderer(int chunkCount) {
-        this(chunkCount, "default");
+    public OpenGLRenderer() {
+        this("default");
     }
 
-    public OpenGLRenderer(int chunkCount, String shaderName) {
+    public OpenGLRenderer(String shaderName) {
         this.pipeline = new RenderPipeline(new FrustumCuller());
         this.shaderProgram = new ShaderProgram();
         this.resourceManager = new GpuResourceManager();
         String resolved = shaderName != null && !shaderName.isBlank() ? shaderName : "default";
         this.pendingShaderName = resolved;
         this.activeShaderName = resolved;
-        logger.info("Renderer initialized with {} GPU mesh slots", chunkCount);
+        logger.info("Renderer initialized");
     }
 
     public void render(SceneSnapshot snapshot) {
@@ -104,6 +104,7 @@ public final class OpenGLRenderer implements MeshUploader {
         if (frameBridge != null) {
             ensurePixelBuffer();
             GL11.glReadBuffer(GL30.GL_COLOR_ATTACHMENT0);
+            GL11.glPixelStorei(GL11.GL_PACK_ALIGNMENT, 1);
             GL11.glReadPixels(0, 0, renderWidth, renderHeight, GL12.GL_BGRA, GL11.GL_UNSIGNED_BYTE, pixelBuffer);
             pixelBuffer.rewind();
             frameBridge.submitFrame(pixelBuffer, renderWidth, renderHeight);
@@ -120,25 +121,38 @@ public final class OpenGLRenderer implements MeshUploader {
         if (shaderName == null || shaderName.isBlank()) {
             return;
         }
-        pendingShaderName = shaderName;
+        if (Thread.currentThread() == renderThread) {
+            pendingShaderName = shaderName;
+        } else {
+            submit(() -> pendingShaderName = shaderName);
+        }
     }
 
     @Override
     public MeshHandle uploadMesh(MeshData meshData) {
         ensureInitialized();
-        return resourceManager.uploadMesh(meshData);
+        if (Thread.currentThread() == renderThread) {
+            return resourceManager.uploadMesh(meshData);
+        }
+        return submit(() -> resourceManager.uploadMesh(meshData)).join();
     }
 
     @Override
     public MaterialHandle uploadMaterial(MaterialData materialData) {
         ensureInitialized();
-        return resourceManager.uploadMaterial(materialData);
+        if (Thread.currentThread() == renderThread) {
+            return resourceManager.uploadMaterial(materialData);
+        }
+        return submit(() -> resourceManager.uploadMaterial(materialData)).join();
     }
 
     @Override
     public TextureHandle uploadTexture(TextureData textureData) {
         ensureInitialized();
-        return resourceManager.uploadTexture(textureData);
+        if (Thread.currentThread() == renderThread) {
+            return resourceManager.uploadTexture(textureData);
+        }
+        return submit(() -> resourceManager.uploadTexture(textureData)).join();
     }
 
     public void init() {
@@ -162,12 +176,18 @@ public final class OpenGLRenderer implements MeshUploader {
         GL11.glEnable(GL11.GL_DEPTH_TEST);
         GL11.glClearColor(0.12f, 0.12f, 0.12f, 1.0f);
         uniforms = new RenderUniforms(1.0f);
-        resourceManager.initDefaultTexture(TextureDataFactory.checkerboard(2, 1));
+        resourceManager.initDefaultTextures(
+            TextureDataFactory.solidColor(255, 255, 255, 255),
+            TextureDataFactory.solidColor(128, 128, 255, 255),
+            TextureDataFactory.solidColor(0, 255, 0, 255),
+            TextureDataFactory.solidColor(255, 255, 255, 255),
+            TextureDataFactory.solidColor(0, 0, 0, 255)
+        );
         ShaderSource shaderSource = ShaderSourceLoader.loadByName(pendingShaderName);
         shaderProgram.init(shaderSource.vertexSource(), shaderSource.fragmentSource());
         shaderProgram.bind();
         shaderProgram.setUniformMat4("uProjection", uniforms.projectionMatrix());
-        shaderProgram.setUniformInt("uTexture", 0);
+        bindSamplers();
         activeShaderName = pendingShaderName;
         resizeRenderTarget(renderWidth, renderHeight);
         initialized = true;
@@ -232,8 +252,17 @@ public final class OpenGLRenderer implements MeshUploader {
         shaderProgram.init(shaderSource.vertexSource(), shaderSource.fragmentSource());
         shaderProgram.bind();
         shaderProgram.setUniformMat4("uProjection", uniforms.projectionMatrix());
-        shaderProgram.setUniformInt("uTexture", 0);
+        bindSamplers();
         activeShaderName = pendingShaderName;
+    }
+
+    private void bindSamplers() {
+        shaderProgram.setUniformIntIfPresent("uTexture", 0);
+        shaderProgram.setUniformIntIfPresent("uBaseColorTex", 0);
+        shaderProgram.setUniformIntIfPresent("uNormalTex", 1);
+        shaderProgram.setUniformIntIfPresent("uMetallicRoughnessTex", 2);
+        shaderProgram.setUniformIntIfPresent("uAoTex", 3);
+        shaderProgram.setUniformIntIfPresent("uEmissiveTex", 4);
     }
 
     private void bindTextureUnit(int textureUnit, GpuTexture texture) {
@@ -255,7 +284,11 @@ public final class OpenGLRenderer implements MeshUploader {
     }
 
     public void setFrameBridge(RenderFrameBridge frameBridge) {
-        this.frameBridge = frameBridge;
+        if (Thread.currentThread() == renderThread) {
+            this.frameBridge = frameBridge;
+        } else {
+            submit(() -> this.frameBridge = frameBridge);
+        }
     }
 
 
@@ -306,6 +339,9 @@ public final class OpenGLRenderer implements MeshUploader {
     }
 
     private void disposeRenderTarget() {
+        GL30.glBindFramebuffer(GL30.GL_FRAMEBUFFER, 0);
+        GL11.glBindTexture(GL11.GL_TEXTURE_2D, 0);
+        GL30.glBindRenderbuffer(GL30.GL_RENDERBUFFER, 0);
         if (framebuffer != 0) {
             GL30.glDeleteFramebuffers(framebuffer);
             framebuffer = 0;

@@ -21,4 +21,13 @@ public final class TextureDataFactory {
         }
         return new TextureData(width, height, rgba);
     }
+
+    public static TextureData solidColor(int r, int g, int b, int a) {
+        byte[] rgba = new byte[4];
+        rgba[0] = (byte) r;
+        rgba[1] = (byte) g;
+        rgba[2] = (byte) b;
+        rgba[3] = (byte) a;
+        return new TextureData(1, 1, rgba);
+    }
 }
