@@ -7,6 +7,7 @@ import com.simplerender.asset.MaterialData;
 import com.simplerender.asset.MeshData;
 import com.simplerender.asset.TextureData;
 import com.simplerender.asset.plugin.ModelImporter;
+import com.simplerender.math.Matrix4f;
 import org.pf4j.Extension;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -39,21 +40,7 @@ public final class GltfModelImporter implements ModelImporter {
 
             JsonArray bufferViews = root.getAsJsonArray("bufferViews");
             JsonArray accessors = root.getAsJsonArray("accessors");
-            JsonObject mesh = root.getAsJsonArray("meshes").get(0).getAsJsonObject();
-            JsonObject primitive = mesh.getAsJsonArray("primitives").get(0).getAsJsonObject();
-            JsonObject attributes = primitive.getAsJsonObject("attributes");
-
-            int positionAccessorIndex = attributes.get("POSITION").getAsInt();
-            int normalAccessorIndex = attributes.has("NORMAL") ? attributes.get("NORMAL").getAsInt() : -1;
-            int indexAccessorIndex = primitive.has("indices") ? primitive.get("indices").getAsInt() : -1;
-
-            float[] positions = readFloatVec3(accessors, bufferViews, bufferBytes, positionAccessorIndex);
-            float[] normals = normalAccessorIndex >= 0
-                ? readFloatVec3(accessors, bufferViews, bufferBytes, normalAccessorIndex)
-                : defaultNormals(positions.length / 3);
-            int[] indices = indexAccessorIndex >= 0
-                ? readIndices(accessors, bufferViews, bufferBytes, indexAccessorIndex)
-                : sequentialIndices(positions.length / 3);
+            MeshParts meshParts = readSceneMeshes(root, accessors, bufferViews, bufferBytes);
 
             float[] baseColor = new float[] {0.8f, 0.8f, 0.8f};
             TextureData textureData = null;
@@ -73,11 +60,198 @@ public final class GltfModelImporter implements ModelImporter {
                 }
             }
 
-            MeshData meshData = new MeshData(positions, normals, indices);
+            MeshData meshData = new MeshData(meshParts.positions(), meshParts.normals(), meshParts.indices());
             MaterialData materialData = new MaterialData(baseColor, textureData);
             return new ImportedModel(meshData, materialData);
         } catch (Exception e) {
             throw new IllegalStateException("Failed to import glTF: " + path, e);
+        }
+    }
+
+    private MeshParts readSceneMeshes(
+        JsonObject root,
+        JsonArray accessors,
+        JsonArray bufferViews,
+        byte[] bufferBytes
+    ) {
+        if (!root.has("meshes")) {
+            return MeshParts.empty();
+        }
+        int sceneIndex = root.has("scene") ? root.get("scene").getAsInt() : 0;
+        JsonArray scenes = root.has("scenes") ? root.getAsJsonArray("scenes") : null;
+        JsonArray nodes = root.has("nodes") ? root.getAsJsonArray("nodes") : new JsonArray();
+        MeshParts combined = new MeshParts();
+        if (scenes != null && sceneIndex < scenes.size()) {
+            JsonObject scene = scenes.get(sceneIndex).getAsJsonObject();
+            JsonArray rootNodes = scene.has("nodes") ? scene.getAsJsonArray("nodes") : new JsonArray();
+            for (int i = 0; i < rootNodes.size(); i++) {
+                int nodeIndex = rootNodes.get(i).getAsInt();
+                traverseNode(nodeIndex, nodes, root, accessors, bufferViews, bufferBytes, Matrix4f.identity(), combined);
+            }
+        } else if (nodes.size() > 0) {
+            for (int i = 0; i < nodes.size(); i++) {
+                traverseNode(i, nodes, root, accessors, bufferViews, bufferBytes, Matrix4f.identity(), combined);
+            }
+        }
+        if (combined.vertexCount() == 0) {
+            return MeshParts.empty();
+        }
+        return combined;
+    }
+
+    private void traverseNode(
+        int nodeIndex,
+        JsonArray nodes,
+        JsonObject root,
+        JsonArray accessors,
+        JsonArray bufferViews,
+        byte[] bufferBytes,
+        float[] parentTransform,
+        MeshParts combined
+    ) {
+        if (nodeIndex < 0 || nodeIndex >= nodes.size()) {
+            return;
+        }
+        JsonObject node = nodes.get(nodeIndex).getAsJsonObject();
+        float[] localTransform = readNodeTransform(node);
+        float[] worldTransform = Matrix4f.multiply(parentTransform, localTransform);
+        if (node.has("mesh")) {
+            int meshIndex = node.get("mesh").getAsInt();
+            appendMesh(meshIndex, root, accessors, bufferViews, bufferBytes, worldTransform, combined);
+        }
+        if (node.has("children")) {
+            JsonArray children = node.getAsJsonArray("children");
+            for (int i = 0; i < children.size(); i++) {
+                int childIndex = children.get(i).getAsInt();
+                traverseNode(childIndex, nodes, root, accessors, bufferViews, bufferBytes, worldTransform, combined);
+            }
+        }
+    }
+
+    private void appendMesh(
+        int meshIndex,
+        JsonObject root,
+        JsonArray accessors,
+        JsonArray bufferViews,
+        byte[] bufferBytes,
+        float[] transform,
+        MeshParts combined
+    ) {
+        JsonArray meshes = root.getAsJsonArray("meshes");
+        if (meshIndex < 0 || meshIndex >= meshes.size()) {
+            return;
+        }
+        JsonObject mesh = meshes.get(meshIndex).getAsJsonObject();
+        JsonArray primitives = mesh.getAsJsonArray("primitives");
+        if (primitives == null) {
+            return;
+        }
+        for (int i = 0; i < primitives.size(); i++) {
+            JsonObject primitive = primitives.get(i).getAsJsonObject();
+            JsonObject attributes = primitive.getAsJsonObject("attributes");
+            int positionAccessorIndex = attributes.get("POSITION").getAsInt();
+            int normalAccessorIndex = attributes.has("NORMAL") ? attributes.get("NORMAL").getAsInt() : -1;
+            int indexAccessorIndex = primitive.has("indices") ? primitive.get("indices").getAsInt() : -1;
+            float[] positions = readFloatVec3(accessors, bufferViews, bufferBytes, positionAccessorIndex);
+            float[] normals = normalAccessorIndex >= 0
+                ? readFloatVec3(accessors, bufferViews, bufferBytes, normalAccessorIndex)
+                : defaultNormals(positions.length / 3);
+            applyTransform(positions, normals, transform);
+            int[] indices = indexAccessorIndex >= 0
+                ? readIndices(accessors, bufferViews, bufferBytes, indexAccessorIndex)
+                : sequentialIndices(positions.length / 3);
+            combined.append(positions, normals, indices);
+        }
+    }
+
+    private float[] readNodeTransform(JsonObject node) {
+        if (node.has("matrix")) {
+            JsonArray matrixArray = node.getAsJsonArray("matrix");
+            float[] matrix = new float[16];
+            for (int i = 0; i < 16; i++) {
+                matrix[i] = matrixArray.get(i).getAsFloat();
+            }
+            return matrix;
+        }
+        float[] translation = new float[] {0.0f, 0.0f, 0.0f};
+        float[] rotation = new float[] {0.0f, 0.0f, 0.0f, 1.0f};
+        float[] scale = new float[] {1.0f, 1.0f, 1.0f};
+        if (node.has("translation")) {
+            JsonArray t = node.getAsJsonArray("translation");
+            translation = new float[] {t.get(0).getAsFloat(), t.get(1).getAsFloat(), t.get(2).getAsFloat()};
+        }
+        if (node.has("rotation")) {
+            JsonArray r = node.getAsJsonArray("rotation");
+            rotation = new float[] {r.get(0).getAsFloat(), r.get(1).getAsFloat(), r.get(2).getAsFloat(), r.get(3).getAsFloat()};
+        }
+        if (node.has("scale")) {
+            JsonArray s = node.getAsJsonArray("scale");
+            scale = new float[] {s.get(0).getAsFloat(), s.get(1).getAsFloat(), s.get(2).getAsFloat()};
+        }
+        return composeTransform(translation, rotation, scale);
+    }
+
+    private float[] composeTransform(float[] translation, float[] rotation, float[] scale) {
+        float x = rotation[0];
+        float y = rotation[1];
+        float z = rotation[2];
+        float w = rotation[3];
+        float xx = x * x;
+        float yy = y * y;
+        float zz = z * z;
+        float xy = x * y;
+        float xz = x * z;
+        float yz = y * z;
+        float wx = w * x;
+        float wy = w * y;
+        float wz = w * z;
+
+        float[] matrix = new float[16];
+        matrix[0] = (1.0f - 2.0f * (yy + zz)) * scale[0];
+        matrix[1] = (2.0f * (xy + wz)) * scale[0];
+        matrix[2] = (2.0f * (xz - wy)) * scale[0];
+        matrix[4] = (2.0f * (xy - wz)) * scale[1];
+        matrix[5] = (1.0f - 2.0f * (xx + zz)) * scale[1];
+        matrix[6] = (2.0f * (yz + wx)) * scale[1];
+        matrix[8] = (2.0f * (xz + wy)) * scale[2];
+        matrix[9] = (2.0f * (yz - wx)) * scale[2];
+        matrix[10] = (1.0f - 2.0f * (xx + yy)) * scale[2];
+        matrix[12] = translation[0];
+        matrix[13] = translation[1];
+        matrix[14] = translation[2];
+        matrix[15] = 1.0f;
+        return matrix;
+    }
+
+    private void applyTransform(float[] positions, float[] normals, float[] matrix) {
+        for (int i = 0; i < positions.length; i += 3) {
+            float x = positions[i];
+            float y = positions[i + 1];
+            float z = positions[i + 2];
+            positions[i] = matrix[0] * x + matrix[4] * y + matrix[8] * z + matrix[12];
+            positions[i + 1] = matrix[1] * x + matrix[5] * y + matrix[9] * z + matrix[13];
+            positions[i + 2] = matrix[2] * x + matrix[6] * y + matrix[10] * z + matrix[14];
+        }
+        if (normals == null) {
+            return;
+        }
+        for (int i = 0; i < normals.length; i += 3) {
+            float x = normals[i];
+            float y = normals[i + 1];
+            float z = normals[i + 2];
+            float nx = matrix[0] * x + matrix[4] * y + matrix[8] * z;
+            float ny = matrix[1] * x + matrix[5] * y + matrix[9] * z;
+            float nz = matrix[2] * x + matrix[6] * y + matrix[10] * z;
+            float length = (float) Math.sqrt(nx * nx + ny * ny + nz * nz);
+            if (length == 0.0f) {
+                normals[i] = 0.0f;
+                normals[i + 1] = 1.0f;
+                normals[i + 2] = 0.0f;
+            } else {
+                normals[i] = nx / length;
+                normals[i + 1] = ny / length;
+                normals[i + 2] = nz / length;
+            }
         }
     }
 
@@ -263,7 +437,7 @@ public final class GltfModelImporter implements ModelImporter {
         };
     }
 
-    private float[] defaultNormals(int vertexCount) {
+    private static float[] defaultNormals(int vertexCount) {
         float[] normals = new float[vertexCount * 3];
         for (int i = 0; i < vertexCount; i++) {
             normals[i * 3] = 0.0f;
@@ -279,6 +453,80 @@ public final class GltfModelImporter implements ModelImporter {
             indices[i] = i;
         }
         return indices;
+    }
+
+    private static final class MeshParts {
+        private float[] positions;
+        private float[] normals;
+        private int[] indices;
+        private int vertexCount;
+        private int indexCount;
+
+        static MeshParts empty() {
+            return new MeshParts();
+        }
+
+        int vertexCount() {
+            return vertexCount;
+        }
+
+        float[] positions() {
+            return positions == null ? new float[0] : Arrays.copyOf(positions, vertexCount * 3);
+        }
+
+        float[] normals() {
+            return normals == null ? new float[0] : Arrays.copyOf(normals, vertexCount * 3);
+        }
+
+        int[] indices() {
+            return indices == null ? new int[0] : Arrays.copyOf(indices, indexCount);
+        }
+
+        void append(float[] newPositions, float[] newNormals, int[] newIndices) {
+            int newVertices = newPositions.length / 3;
+            ensureVertexCapacity(vertexCount + newVertices);
+            System.arraycopy(newPositions, 0, positions, vertexCount * 3, newPositions.length);
+            if (normals == null) {
+                normals = new float[positions.length];
+            }
+            if (newNormals != null && newNormals.length == newPositions.length) {
+                System.arraycopy(newNormals, 0, normals, vertexCount * 3, newNormals.length);
+            } else {
+                float[] fallback = defaultNormals(newVertices);
+                System.arraycopy(fallback, 0, normals, vertexCount * 3, fallback.length);
+            }
+            ensureIndexCapacity(indexCount + newIndices.length);
+            for (int i = 0; i < newIndices.length; i++) {
+                indices[indexCount + i] = newIndices[i] + vertexCount;
+            }
+            indexCount += newIndices.length;
+            vertexCount += newVertices;
+        }
+
+        private void ensureVertexCapacity(int requiredVertices) {
+            int requiredLength = requiredVertices * 3;
+            if (positions == null) {
+                positions = new float[requiredLength];
+                normals = new float[requiredLength];
+                return;
+            }
+            if (positions.length < requiredLength) {
+                int newLength = Math.max(requiredLength, positions.length * 2);
+                positions = Arrays.copyOf(positions, newLength);
+                normals = Arrays.copyOf(normals, newLength);
+            }
+        }
+
+        private void ensureIndexCapacity(int requiredIndices) {
+            if (indices == null) {
+                indices = new int[requiredIndices];
+                return;
+            }
+            if (indices.length < requiredIndices) {
+                int newLength = Math.max(requiredIndices, indices.length * 2);
+                indices = Arrays.copyOf(indices, newLength);
+            }
+        }
     }
 
     private record GltfAsset(JsonObject root, byte[] buffer) {
