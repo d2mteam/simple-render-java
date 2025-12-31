@@ -4,6 +4,7 @@ import com.simplerender.asset.plugin.ModelImporter;
 import com.simplerender.gl.OpenGLRenderer;
 import javafx.application.Platform;
 import javafx.geometry.Insets;
+import javafx.geometry.Point2D;
 import javafx.geometry.Pos;
 import javafx.scene.control.Button;
 import javafx.scene.control.ComboBox;
@@ -12,10 +13,9 @@ import javafx.scene.control.ListView;
 import javafx.scene.control.TextField;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.GridPane;
-import javafx.scene.layout.HBox;
+import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
-import org.lwjgl.glfw.GLFW;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -26,6 +26,9 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public final class RenderControlPanel {
     private static final Logger logger = LoggerFactory.getLogger(RenderControlPanel.class);
     private static final AtomicBoolean started = new AtomicBoolean(false);
+    private static final int CONTROL_WIDTH = 320;
+    private static final int DEFAULT_RENDER_WIDTH = 960;
+    private static final int DEFAULT_RENDER_HEIGHT = 600;
 
     private RenderControlPanel() {
     }
@@ -40,7 +43,7 @@ public final class RenderControlPanel {
 
     private static void showStage(com.simplerender.scene.Scene scene, OpenGLRenderer renderer, ModelImportService importService) {
         Stage stage = new Stage();
-        stage.setTitle("Render Sidebar");
+        stage.setTitle("Simple Render");
         BorderPane root = new BorderPane();
         root.setPadding(new Insets(12));
 
@@ -67,9 +70,17 @@ public final class RenderControlPanel {
                 logger.warn("Failed to import model from {}", modelPath.get());
                 return;
             }
-            int index = scene.addImportedObject(renderer, imported.get());
-            refreshObjectList(scene, objectList);
-            objectList.getSelectionModel().select(index);
+            renderer.submit(() -> scene.addImportedObject(renderer, imported.get()))
+                .whenComplete((index, error) -> {
+                    if (error != null) {
+                        logger.error("Failed to upload imported model {}", modelPath.get(), error);
+                        return;
+                    }
+                    Platform.runLater(() -> {
+                        refreshObjectList(scene, objectList);
+                        objectList.getSelectionModel().select(index);
+                    });
+                });
         });
 
         Button applyTransform = new Button("Apply Transform");
@@ -122,15 +133,25 @@ public final class RenderControlPanel {
             applyShader
         );
         controls.setAlignment(Pos.TOP_LEFT);
+        controls.setPrefWidth(CONTROL_WIDTH);
         root.setLeft(controls);
 
-        HBox spacer = new HBox();
-        spacer.setPrefWidth(8);
-        root.setCenter(spacer);
+        Region renderPlaceholder = new Region();
+        renderPlaceholder.setMinSize(400, 300);
+        renderPlaceholder.setPrefSize(DEFAULT_RENDER_WIDTH, DEFAULT_RENDER_HEIGHT);
+        root.setCenter(renderPlaceholder);
 
-        stage.setScene(new javafx.scene.Scene(root, 320, 520));
+        stage.setMinWidth(CONTROL_WIDTH + GAP + 400);
+        stage.setMinHeight(360);
+        stage.setScene(new javafx.scene.Scene(root, CONTROL_WIDTH + GAP + DEFAULT_RENDER_WIDTH, DEFAULT_RENDER_HEIGHT + 24));
         stage.show();
-        anchorSidebarToRender(stage, renderer);
+        stage.xProperty().addListener((obs, oldValue, newValue) -> syncRenderWindow(renderPlaceholder, renderer));
+        stage.yProperty().addListener((obs, oldValue, newValue) -> syncRenderWindow(renderPlaceholder, renderer));
+        stage.widthProperty().addListener((obs, oldValue, newValue) -> syncRenderWindow(renderPlaceholder, renderer));
+        stage.heightProperty().addListener((obs, oldValue, newValue) -> syncRenderWindow(renderPlaceholder, renderer));
+        renderPlaceholder.widthProperty().addListener((obs, oldValue, newValue) -> syncRenderWindow(renderPlaceholder, renderer));
+        renderPlaceholder.heightProperty().addListener((obs, oldValue, newValue) -> syncRenderWindow(renderPlaceholder, renderer));
+        Platform.runLater(() -> syncRenderWindow(renderPlaceholder, renderer));
         logger.info("Render control panel opened");
     }
 
@@ -144,16 +165,20 @@ public final class RenderControlPanel {
         }
     }
 
-    private static void anchorSidebarToRender(Stage stage, OpenGLRenderer renderer) {
+    private static void syncRenderWindow(Region renderPlaceholder, OpenGLRenderer renderer) {
         try {
-            int[] x = new int[1];
-            int[] y = new int[1];
-            GLFW.glfwGetWindowPos(renderer.windowHandle(), x, y);
-            double sidebarWidth = stage.getWidth() > 0 ? stage.getWidth() : 320;
-            stage.setX(x[0] - sidebarWidth - 12);
-            stage.setY(y[0]);
+            Point2D origin = renderPlaceholder.localToScreen(0, 0);
+            if (origin == null) {
+                return;
+            }
+            int x = (int) Math.round(origin.getX());
+            int y = (int) Math.round(origin.getY());
+            int width = (int) Math.round(Math.max(renderPlaceholder.getWidth(), 1));
+            int height = (int) Math.round(Math.max(renderPlaceholder.getHeight(), 1));
+            renderer.setWindowSize(width, height);
+            renderer.setWindowPosition(x, y);
         } catch (Exception e) {
-            logger.warn("Failed to anchor sidebar to render window", e);
+            logger.warn("Failed to sync render window position", e);
         }
     }
 }

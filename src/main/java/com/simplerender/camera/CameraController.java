@@ -45,8 +45,8 @@ public final class CameraController {
             moveY -= camera.forward().y();
             moveZ -= camera.forward().z();
         }
-        float rightX = camera.forward().z();
-        float rightZ = -camera.forward().x();
+        float rightX = -camera.forward().z();
+        float rightZ = camera.forward().x();
         float rightLen = (float) Math.sqrt(rightX * rightX + rightZ * rightZ);
         if (rightLen > 0.0f) {
             rightX /= rightLen;
