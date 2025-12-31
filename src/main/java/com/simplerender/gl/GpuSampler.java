@@ -22,9 +22,12 @@ final class GpuSampler {
 
     private int normalizeMinFilter(int filter) {
         return switch (filter) {
-            case SamplerData.NEAREST,
-                SamplerData.NEAREST_MIPMAP_NEAREST,
-                SamplerData.NEAREST_MIPMAP_LINEAR -> GL11.GL_NEAREST;
+            case SamplerData.NEAREST -> GL11.GL_NEAREST;
+            case SamplerData.LINEAR -> GL11.GL_LINEAR;
+            case SamplerData.NEAREST_MIPMAP_NEAREST -> GL11.GL_NEAREST_MIPMAP_NEAREST;
+            case SamplerData.LINEAR_MIPMAP_NEAREST -> GL11.GL_LINEAR_MIPMAP_NEAREST;
+            case SamplerData.NEAREST_MIPMAP_LINEAR -> GL11.GL_NEAREST_MIPMAP_LINEAR;
+            case SamplerData.LINEAR_MIPMAP_LINEAR -> GL11.GL_LINEAR_MIPMAP_LINEAR;
             default -> GL11.GL_LINEAR;
         };
     }

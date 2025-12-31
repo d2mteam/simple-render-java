@@ -13,7 +13,7 @@ out vec3 vBitangent;
 out vec2 vTexCoord;
 void main() {
     vec4 worldPos = uModel * vec4(aPos, 1.0);
-    mat3 normalMatrix = mat3(uModel);
+    mat3 normalMatrix = transpose(inverse(mat3(uModel)));
     vNormal = normalMatrix * aNormal;
     vTangent = normalMatrix * aTangent;
     vBitangent = normalMatrix * aBitangent;
