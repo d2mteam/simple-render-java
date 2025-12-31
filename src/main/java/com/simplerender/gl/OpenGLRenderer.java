@@ -38,6 +38,7 @@ public final class OpenGLRenderer implements MeshUploader {
     private long window;
     private final Queue<Runnable> pendingTasks = new ConcurrentLinkedQueue<>();
     private Thread renderThread;
+    private volatile boolean cursorInside = true;
 
     public OpenGLRenderer(int chunkCount) {
         this(chunkCount, "default");
@@ -134,7 +135,7 @@ public final class OpenGLRenderer implements MeshUploader {
         }
         GLFW.glfwWindowHint(GLFW.GLFW_VISIBLE, GLFW.GLFW_FALSE);
         GLFW.glfwWindowHint(GLFW.GLFW_DECORATED, GLFW.GLFW_FALSE);
-        GLFW.glfwWindowHint(GLFW.GLFW_RESIZABLE, GLFW.GLFW_FALSE);
+        GLFW.glfwWindowHint(GLFW.GLFW_RESIZABLE, GLFW.GLFW_TRUE);
         window = GLFW.glfwCreateWindow(800, 600, "Simple Render", 0, 0);
         if (window == 0) {
             logger.error("Failed to create GLFW window");
@@ -142,7 +143,8 @@ public final class OpenGLRenderer implements MeshUploader {
         }
         GLFW.glfwMakeContextCurrent(window);
         GLFW.glfwSwapInterval(1);
-        GLFW.glfwSetInputMode(window, GLFW.GLFW_CURSOR, GLFW.GLFW_CURSOR_DISABLED);
+        GLFW.glfwSetInputMode(window, GLFW.GLFW_CURSOR, GLFW.GLFW_CURSOR_NORMAL);
+        GLFW.glfwSetCursorEnterCallback(window, (handle, entered) -> cursorInside = entered);
         GLFW.glfwShowWindow(window);
         GL.createCapabilities();
         GL11.glEnable(GL11.GL_DEPTH_TEST);
@@ -221,6 +223,10 @@ public final class OpenGLRenderer implements MeshUploader {
     public long windowHandle() {
         ensureInitialized();
         return window;
+    }
+
+    public boolean isCursorInside() {
+        return cursorInside;
     }
 
     public <T> CompletableFuture<T> submit(Callable<T> task) {

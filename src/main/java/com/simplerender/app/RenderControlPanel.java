@@ -27,9 +27,8 @@ public final class RenderControlPanel {
     private static final Logger logger = LoggerFactory.getLogger(RenderControlPanel.class);
     private static final AtomicBoolean started = new AtomicBoolean(false);
     private static final int CONTROL_WIDTH = 320;
-    private static final int RENDER_WIDTH = 960;
-    private static final int RENDER_HEIGHT = 600;
-    private static final int GAP = 8;
+    private static final int DEFAULT_RENDER_WIDTH = 960;
+    private static final int DEFAULT_RENDER_HEIGHT = 600;
 
     private RenderControlPanel() {
     }
@@ -138,16 +137,21 @@ public final class RenderControlPanel {
         root.setLeft(controls);
 
         Region renderPlaceholder = new Region();
-        renderPlaceholder.setPrefSize(RENDER_WIDTH, RENDER_HEIGHT);
+        renderPlaceholder.setMinSize(400, 300);
+        renderPlaceholder.setPrefSize(DEFAULT_RENDER_WIDTH, DEFAULT_RENDER_HEIGHT);
         root.setCenter(renderPlaceholder);
 
-        stage.setScene(new javafx.scene.Scene(root, CONTROL_WIDTH + GAP + RENDER_WIDTH, RENDER_HEIGHT + 24));
+        stage.setMinWidth(CONTROL_WIDTH + GAP + 400);
+        stage.setMinHeight(360);
+        stage.setScene(new javafx.scene.Scene(root, CONTROL_WIDTH + GAP + DEFAULT_RENDER_WIDTH, DEFAULT_RENDER_HEIGHT + 24));
         stage.show();
-        stage.xProperty().addListener((obs, oldValue, newValue) -> syncRenderWindow(stage, root, renderer));
-        stage.yProperty().addListener((obs, oldValue, newValue) -> syncRenderWindow(stage, root, renderer));
-        stage.widthProperty().addListener((obs, oldValue, newValue) -> syncRenderWindow(stage, root, renderer));
-        stage.heightProperty().addListener((obs, oldValue, newValue) -> syncRenderWindow(stage, root, renderer));
-        Platform.runLater(() -> syncRenderWindow(stage, root, renderer));
+        stage.xProperty().addListener((obs, oldValue, newValue) -> syncRenderWindow(renderPlaceholder, renderer));
+        stage.yProperty().addListener((obs, oldValue, newValue) -> syncRenderWindow(renderPlaceholder, renderer));
+        stage.widthProperty().addListener((obs, oldValue, newValue) -> syncRenderWindow(renderPlaceholder, renderer));
+        stage.heightProperty().addListener((obs, oldValue, newValue) -> syncRenderWindow(renderPlaceholder, renderer));
+        renderPlaceholder.widthProperty().addListener((obs, oldValue, newValue) -> syncRenderWindow(renderPlaceholder, renderer));
+        renderPlaceholder.heightProperty().addListener((obs, oldValue, newValue) -> syncRenderWindow(renderPlaceholder, renderer));
+        Platform.runLater(() -> syncRenderWindow(renderPlaceholder, renderer));
         logger.info("Render control panel opened");
     }
 
@@ -161,15 +165,17 @@ public final class RenderControlPanel {
         }
     }
 
-    private static void syncRenderWindow(Stage stage, BorderPane root, OpenGLRenderer renderer) {
+    private static void syncRenderWindow(Region renderPlaceholder, OpenGLRenderer renderer) {
         try {
-            Point2D origin = root.localToScreen(0, 0);
+            Point2D origin = renderPlaceholder.localToScreen(0, 0);
             if (origin == null) {
                 return;
             }
-            int x = (int) Math.round(origin.getX() + CONTROL_WIDTH + GAP);
+            int x = (int) Math.round(origin.getX());
             int y = (int) Math.round(origin.getY());
-            renderer.setWindowSize(RENDER_WIDTH, RENDER_HEIGHT);
+            int width = (int) Math.round(Math.max(renderPlaceholder.getWidth(), 1));
+            int height = (int) Math.round(Math.max(renderPlaceholder.getHeight(), 1));
+            renderer.setWindowSize(width, height);
             renderer.setWindowPosition(x, y);
         } catch (Exception e) {
             logger.warn("Failed to sync render window position", e);
