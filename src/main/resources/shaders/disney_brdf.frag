@@ -1,7 +1,8 @@
 #version 330 core
 in vec3 vNormal;
+in vec3 vTangent;
+in vec3 vBitangent;
 in vec2 vTexCoord;
-in vec3 vWorldPos;
 uniform vec3 uLightDir;
 uniform vec3 uBaseColor;
 uniform sampler2D uTexture;
@@ -19,21 +20,11 @@ float schlickWeight(float cosTheta) {
 
 void main() {
     vec3 n = normalize(vNormal);
-    vec3 dp1 = dFdx(vWorldPos);
-    vec3 dp2 = dFdy(vWorldPos);
-    vec2 duv1 = dFdx(vTexCoord);
-    vec2 duv2 = dFdy(vTexCoord);
-    vec3 t = dp1 * duv2.y - dp2 * duv1.y;
-    vec3 b = -dp1 * duv2.x + dp2 * duv1.x;
-    float tLen = length(t);
-    float bLen = length(b);
-    if (tLen > 0.0 && bLen > 0.0) {
-        t /= tLen;
-        b /= bLen;
-        mat3 tbn = mat3(t, b, n);
-        vec3 normalSample = texture(uNormalTex, vTexCoord).rgb * 2.0 - 1.0;
-        n = normalize(tbn * normalSample);
-    }
+    vec3 t = normalize(vTangent);
+    vec3 b = normalize(vBitangent);
+    mat3 tbn = mat3(t, b, n);
+    vec3 normalSample = texture(uNormalTex, vTexCoord).rgb * 2.0 - 1.0;
+    n = normalize(tbn * normalSample);
     vec3 l = normalize(-uLightDir);
     vec3 v = vec3(0.0, 0.0, 1.0);
     vec3 h = normalize(l + v);
