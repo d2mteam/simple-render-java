@@ -34,6 +34,12 @@ public final class ShaderSourceLoader {
         return new ShaderSource(vertexSource, fragmentSource);
     }
 
+    public static String loadCompute(String computePath) {
+        String computeSource = readResource(computePath);
+        logger.info("Loaded compute shader source: {}", computePath);
+        return computeSource;
+    }
+
     private static String readResource(String resourcePath) {
         try (InputStream input = ShaderSourceLoader.class.getClassLoader().getResourceAsStream(resourcePath)) {
             if (input == null) {

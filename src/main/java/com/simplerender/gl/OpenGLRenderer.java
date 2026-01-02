@@ -34,6 +34,7 @@ import org.lwjgl.opengl.GL15;
 import org.lwjgl.opengl.GL20;
 import org.lwjgl.opengl.GL30;
 import org.lwjgl.opengl.GL33;
+import org.lwjgl.opengl.GL42;
 import org.lwjgl.BufferUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -176,6 +177,7 @@ public final class OpenGLRenderer implements MeshUploader {
         initScreenQuad();
         activeShaderName = pendingShaderName;
         resizeRenderTarget(renderWidth, renderHeight);
+        startTimeNanos = System.nanoTime();
         initialized = true;
         logger.info("OpenGL context initialized");
     }
