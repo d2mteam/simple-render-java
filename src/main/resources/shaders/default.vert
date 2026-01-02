@@ -11,6 +11,7 @@ out vec3 vNormal;
 out vec3 vTangent;
 out vec3 vBitangent;
 out vec2 vTexCoord;
+out vec3 vWorldPos;
 void main() {
     vec4 worldPos = uModel * vec4(aPos, 1.0);
     mat3 normalMatrix = transpose(inverse(mat3(uModel)));
@@ -18,5 +19,6 @@ void main() {
     vTangent = normalMatrix * aTangent;
     vBitangent = normalMatrix * aBitangent;
     vTexCoord = aTexCoord;
+    vWorldPos = worldPos.xyz;
     gl_Position = uProjection * uView * worldPos;
 }

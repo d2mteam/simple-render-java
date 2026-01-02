@@ -80,7 +80,7 @@ public final class OpenGLRenderer implements MeshUploader {
         uniforms.updateView(snapshot.camera().position(), snapshot.camera().forward(), snapshot.camera().up());
         shaderProgram.setUniformMat4("uProjection", uniforms.projectionMatrix());
         shaderProgram.setUniformMat4("uView", uniforms.viewMatrix());
-        shaderProgram.setUniformVec3("uLightDir", uniforms.lightDirection());
+        applyLightUniforms();
         pipeline.updateFrustum(uniforms.projectionMatrix(), uniforms.viewMatrix());
         RenderItem[] renderItems = snapshot.renderItems();
         for (int i = 0; i < renderItems.length; i++) {
@@ -277,6 +277,19 @@ public final class OpenGLRenderer implements MeshUploader {
         shaderProgram.setUniformMat4("uProjection", uniforms.projectionMatrix());
         bindSamplers();
         activeShaderName = pendingShaderName;
+    }
+
+    private void applyLightUniforms() {
+        int count = uniforms.lightCount();
+        shaderProgram.setUniformInt("uLightCount", count);
+        for (int i = 0; i < count; i++) {
+            RenderUniforms.Light light = uniforms.light(i);
+            shaderProgram.setUniformInt("uLightType[" + i + "]", light.type());
+            shaderProgram.setUniformVec3("uLightColor[" + i + "]", light.color());
+            shaderProgram.setUniformVec3("uLightPosition[" + i + "]", light.position());
+            shaderProgram.setUniformVec3("uLightDirection[" + i + "]", light.direction());
+            shaderProgram.setUniformVec4("uLightParams[" + i + "]", light.params());
+        }
     }
 
     private void bindSamplers() {
