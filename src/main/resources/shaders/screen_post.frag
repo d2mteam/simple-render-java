@@ -4,6 +4,7 @@ out vec4 FragColor;
 
 uniform sampler2D uSceneColor;
 uniform sampler2D uSceneDepth;
+uniform sampler2D uRayTraceTex;
 uniform int uFrameIndex;
 uniform vec2 uTexelSize;
 
@@ -18,6 +19,7 @@ uniform int uEnableSsao;
 uniform int uEnableSsr;
 uniform int uEnableSsgi;
 uniform int uEnableContactShadows;
+uniform int uEnableRayTracing;
 
 uniform float uExposure;
 uniform float uBloomStrength;
@@ -35,6 +37,7 @@ uniform float uSsaoRadius;
 uniform float uSsrStrength;
 uniform float uSsgiStrength;
 uniform float uContactShadowStrength;
+uniform float uRayTracingMix;
 
 float rand(vec2 co, float seed) {
     return fract(sin(dot(co + seed, vec2(12.9898, 78.233))) * 43758.5453);
@@ -146,6 +149,10 @@ void main() {
         float luma = dot(color, vec3(0.2126, 0.7152, 0.0722));
         color = mix(vec3(luma), color, uColorGradeSaturation);
         color *= uColorGradeTint;
+    }
+    if (uEnableRayTracing == 1) {
+        vec3 rayColor = texture(uRayTraceTex, uv).rgb;
+        color = mix(color, rayColor, uRayTracingMix);
     }
     if (uEnableToneMap == 1) {
         color *= uExposure;

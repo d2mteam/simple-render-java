@@ -154,3 +154,61 @@ Scene -> SceneSnapshot -> OpenGLRenderer.render()
 - Khi thêm hiệu ứng mới: tạo pass riêng trong Render Graph (giữ đúng thứ tự).
 - Khi thêm resource mới: upload qua `MeshUploader` để đảm bảo thread safety.
 - Khi cần debug: bật log tại `OpenGLRenderer` và kiểm tra framebuffer status.
+
+---
+
+## Memory & Buffer Allocators (định hướng cho framework)
+Phần này mô tả các cơ chế cấp bộ nhớ nên chuẩn bị cho framework (CPU-side buffers, staging, upload, scratch). Mục tiêu là **thay thế `malloc` mặc định** cho các tình huống cần hiệu năng, kiểm soát lifetime, hoặc giảm phân mảnh.
+
+### 1) Linear / Arena Allocator
+**Dùng khi:** dữ liệu có cùng lifetime theo frame hoặc theo phase (frame scratch, temporary).  
+**Ưu điểm:** cực nhanh, reset O(1).  
+**Nhược điểm:** không giải phóng riêng lẻ.  
+**Khuyến nghị:** dùng cho **frame scratch**, CPU staging buffer, job system temporary memory.
+
+### 2) Stack Allocator
+**Dùng khi:** cấp phát theo LIFO (push/pop).  
+**Ưu điểm:** nhanh, deterministic, dễ debug.  
+**Nhược điểm:** phải giải phóng đúng thứ tự.  
+**Khuyến nghị:** dùng cho **per-pass temporary**, shader compile staging, small transient buffers.
+
+### 3) Pool Allocator
+**Dùng khi:** nhiều đối tượng cùng kích thước (components, handles, small structs).  
+**Ưu điểm:** constant-time alloc/free, tránh phân mảnh.  
+**Nhược điểm:** chỉ phù hợp fixed-size.  
+**Khuyến nghị:** dùng cho **RenderItem**, `MaterialHandle`, `MeshHandle`, hoặc objects có lifetime lâu.
+
+### 4) Slab Allocator
+**Dùng khi:** nhiều kích thước nhỏ khác nhau nhưng có nhóm rõ ràng.  
+**Ưu điểm:** giảm phân mảnh cho small allocations, thường dùng trong kernel/low-level systems.  
+**Nhược điểm:** quản lý phức tạp hơn Pool.  
+**Khuyến nghị:** dùng cho **small resources** (descriptor-like data, small arrays, metadata).
+
+### 5) Buddy Allocator
+**Dùng khi:** cần cấp phát block lớn/nhỏ linh hoạt (GPU upload heap, texture atlas).  
+**Ưu điểm:** split/merge theo power-of-two, dễ quản lý.  
+**Nhược điểm:** internal fragmentation.  
+**Khuyến nghị:** dùng cho **GPU heap emulation** hoặc large buffers với size biến thiên.
+
+### 6) TLSF (Two-Level Segregated Fit)
+**Dùng khi:** cần real-time allocation với O(1) và ít fragmentation.  
+**Ưu điểm:** nhanh, deterministic, tốt cho runtime.  
+**Nhược điểm:** cài đặt phức tạp hơn.  
+**Khuyến nghị:** dùng cho **core runtime allocator** khi cần cấp phát/giải phóng thường xuyên.
+
+### 7) malloc replacement (jemalloc, mimalloc, tcmalloc)
+**Dùng khi:** muốn thay `malloc` toàn hệ thống bằng allocator tối ưu.  
+**Ưu điểm:** cải thiện fragmentation, throughput.  
+**Nhược điểm:** phụ thuộc runtime/platform.  
+**Khuyến nghị:** dùng khi **scale lớn**, profiling cho thấy `malloc` là bottleneck.
+
+---
+
+## Gợi ý chọn allocator theo use-case
+- **Frame temporary / scratch** → Linear / Arena.  
+- **Per-pass temporary** → Stack.  
+- **Handles/objects fixed-size** → Pool.  
+- **Metadata nhỏ, nhiều kích cỡ** → Slab.  
+- **Resource heap lớn** → Buddy.  
+- **Runtime real-time alloc/free** → TLSF.  
+- **Global replacement** → jemalloc / mimalloc / tcmalloc (tùy platform).
