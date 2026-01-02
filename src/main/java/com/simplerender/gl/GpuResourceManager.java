@@ -34,30 +34,61 @@ final class GpuResourceManager {
     private TextureHandle defaultEmissiveTexture;
     private SamplerHandle defaultSampler;
 
+    public MeshHandle createMeshHandle() {
+        return new MeshHandle(meshId.incrementAndGet());
+    }
+
+    public MaterialHandle createMaterialHandle() {
+        return new MaterialHandle(materialId.incrementAndGet());
+    }
+
+    public TextureHandle createTextureHandle() {
+        return new TextureHandle(textureId.incrementAndGet());
+    }
+
+    public SamplerHandle createSamplerHandle() {
+        return new SamplerHandle(samplerId.incrementAndGet());
+    }
+
     public MeshHandle uploadMesh(MeshData meshData) {
-        MeshHandle handle = new MeshHandle(meshId.incrementAndGet());
-        GPUMesh mesh = new GPUMesh();
-        mesh.upload(meshData);
-        meshes.put(handle, mesh);
-        logger.info("Uploaded mesh handle {}", handle.hashCode());
+        MeshHandle handle = createMeshHandle();
+        uploadMesh(handle, meshData, MeshUploadMode.STATIC_ONE_SHOT);
         return handle;
     }
 
+    public void uploadMesh(MeshHandle handle, MeshData meshData, MeshUploadMode uploadMode) {
+        GPUMesh mesh = new GPUMesh();
+        mesh.upload(meshData, uploadMode);
+        meshes.put(handle, mesh);
+        logger.info("Uploaded mesh handle {}", handle.hashCode());
+    }
+
     public MaterialHandle uploadMaterial(MaterialData materialData) {
-        TextureHandle baseColorHandle = resolveTexture(materialData.baseColorTexture(), defaultBaseColorTexture);
-        SamplerHandle baseColorSampler = resolveSampler(materialData.baseColorTexture(), defaultSampler);
-        TextureHandle normalHandle = resolveTexture(materialData.normalTexture(), defaultNormalTexture);
-        SamplerHandle normalSampler = resolveSampler(materialData.normalTexture(), defaultSampler);
+        MaterialHandle handle = createMaterialHandle();
+        uploadMaterial(handle, materialData, this::uploadTexture, this::uploadSampler);
+        return handle;
+    }
+
+    public void uploadMaterial(
+        MaterialHandle handle,
+        MaterialData materialData,
+        TextureUploadDelegate textureUpload,
+        SamplerUploadDelegate samplerUpload
+    ) {
+        TextureHandle baseColorHandle = resolveTexture(materialData.baseColorTexture(), defaultBaseColorTexture, textureUpload);
+        SamplerHandle baseColorSampler = resolveSampler(materialData.baseColorTexture(), defaultSampler, samplerUpload);
+        TextureHandle normalHandle = resolveTexture(materialData.normalTexture(), defaultNormalTexture, textureUpload);
+        SamplerHandle normalSampler = resolveSampler(materialData.normalTexture(), defaultSampler, samplerUpload);
         TextureHandle metallicRoughnessHandle = resolveTexture(
             materialData.metallicRoughnessTexture(),
-            defaultMetallicRoughnessTexture
+            defaultMetallicRoughnessTexture,
+            textureUpload
         );
-        SamplerHandle metallicRoughnessSampler = resolveSampler(materialData.metallicRoughnessTexture(), defaultSampler);
-        TextureHandle aoHandle = resolveTexture(materialData.aoTexture(), defaultAoTexture);
-        SamplerHandle aoSampler = resolveSampler(materialData.aoTexture(), defaultSampler);
-        TextureHandle emissiveHandle = resolveTexture(materialData.emissiveTexture(), defaultEmissiveTexture);
-        SamplerHandle emissiveSampler = resolveSampler(materialData.emissiveTexture(), defaultSampler);
-        MaterialHandle handle = new MaterialHandle(materialId.incrementAndGet());
+        SamplerHandle metallicRoughnessSampler = resolveSampler(materialData.metallicRoughnessTexture(), defaultSampler, samplerUpload);
+        TextureHandle aoHandle = resolveTexture(materialData.aoTexture(), defaultAoTexture, textureUpload);
+        SamplerHandle aoSampler = resolveSampler(materialData.aoTexture(), defaultSampler, samplerUpload);
+        TextureHandle emissiveHandle = resolveTexture(materialData.emissiveTexture(), defaultEmissiveTexture, textureUpload);
+        SamplerHandle emissiveSampler = resolveSampler(materialData.emissiveTexture(), defaultSampler, samplerUpload);
         materials.put(handle, new GpuMaterial(
             materialData.baseColor(),
             baseColorHandle,
@@ -72,21 +103,28 @@ final class GpuResourceManager {
             emissiveSampler
         ));
         logger.info("Uploaded material handle {}", handle.hashCode());
-        return handle;
     }
 
     public TextureHandle uploadTexture(TextureData textureData) {
-        TextureHandle handle = new TextureHandle(textureId.incrementAndGet());
-        textures.put(handle, new GpuTexture(textureData));
-        logger.info("Uploaded texture handle {}", handle.hashCode());
+        TextureHandle handle = createTextureHandle();
+        registerTexture(handle, new GpuTexture(textureData));
         return handle;
     }
 
     public SamplerHandle uploadSampler(SamplerData samplerData) {
-        SamplerHandle handle = new SamplerHandle(samplerId.incrementAndGet());
-        samplers.put(handle, new GpuSampler(samplerData));
-        logger.info("Uploaded sampler handle {}", handle.hashCode());
+        SamplerHandle handle = createSamplerHandle();
+        registerSampler(handle, new GpuSampler(samplerData));
         return handle;
+    }
+
+    public void registerTexture(TextureHandle handle, GpuTexture texture) {
+        textures.put(handle, texture);
+        logger.info("Uploaded texture handle {}", handle.hashCode());
+    }
+
+    public void registerSampler(SamplerHandle handle, GpuSampler sampler) {
+        samplers.put(handle, sampler);
+        logger.info("Uploaded sampler handle {}", handle.hashCode());
     }
 
     public void initDefaultTextures(
@@ -143,12 +181,30 @@ final class GpuResourceManager {
         return samplers.get(defaultSampler);
     }
 
-    private TextureHandle resolveTexture(java.util.Optional<TextureSlot> slot, TextureHandle fallback) {
-        return slot.map(TextureSlot::textureData).map(this::uploadTexture).orElse(fallback);
+    private TextureHandle resolveTexture(
+        java.util.Optional<TextureSlot> slot,
+        TextureHandle fallback,
+        TextureUploadDelegate textureUpload
+    ) {
+        return slot.map(TextureSlot::textureData).map(textureUpload::upload).orElse(fallback);
     }
 
-    private SamplerHandle resolveSampler(java.util.Optional<TextureSlot> slot, SamplerHandle fallback) {
-        return slot.flatMap(TextureSlot::samplerData).map(this::uploadSampler).orElse(fallback);
+    private SamplerHandle resolveSampler(
+        java.util.Optional<TextureSlot> slot,
+        SamplerHandle fallback,
+        SamplerUploadDelegate samplerUpload
+    ) {
+        return slot.flatMap(TextureSlot::samplerData).map(samplerUpload::upload).orElse(fallback);
+    }
+
+    @FunctionalInterface
+    interface TextureUploadDelegate {
+        TextureHandle upload(TextureData textureData);
+    }
+
+    @FunctionalInterface
+    interface SamplerUploadDelegate {
+        SamplerHandle upload(SamplerData samplerData);
     }
 
     record GpuMaterial(
