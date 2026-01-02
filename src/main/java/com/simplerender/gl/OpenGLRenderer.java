@@ -45,7 +45,6 @@ public final class OpenGLRenderer implements MeshUploader {
     private final RenderPipeline pipeline;
     private final ShaderProgram shaderProgram;
     private final ShaderProgram postShaderProgram;
-    private final ComputeShaderProgram rayTracingProgram;
     private final GpuResourceManager resourceManager;
     private final RenderGraph renderGraph;
     private RenderUniforms uniforms;
@@ -62,14 +61,12 @@ public final class OpenGLRenderer implements MeshUploader {
     private int sceneDepthTexture;
     private int postFramebuffer;
     private int postColorTexture;
-    private int rayTracingTexture;
     private int renderWidth = 1;
     private int renderHeight = 1;
     private ByteBuffer pixelBuffer;
     private int screenQuadVao;
     private int screenQuadVbo;
     private int frameIndex;
-    private long startTimeNanos;
 
     public OpenGLRenderer() {
         this("default");
@@ -79,7 +76,6 @@ public final class OpenGLRenderer implements MeshUploader {
         this.pipeline = new RenderPipeline(new FrustumCuller());
         this.shaderProgram = new ShaderProgram();
         this.postShaderProgram = new ShaderProgram();
-        this.rayTracingProgram = new ComputeShaderProgram();
         this.resourceManager = new GpuResourceManager();
         this.renderGraph = buildRenderGraph();
         String resolved = shaderName != null && !shaderName.isBlank() ? shaderName : "default";
@@ -178,9 +174,6 @@ public final class OpenGLRenderer implements MeshUploader {
         postShaderProgram.bind();
         postShaderProgram.setUniformInt("uSceneColor", 0);
         postShaderProgram.setUniformInt("uSceneDepth", 1);
-        postShaderProgram.setUniformInt("uRayTraceTex", 2);
-        String rayTracingSource = ShaderSourceLoader.loadCompute("shaders/raytracing_demo.comp");
-        rayTracingProgram.init(rayTracingSource);
         initScreenQuad();
         activeShaderName = pendingShaderName;
         resizeRenderTarget(renderWidth, renderHeight);
@@ -213,7 +206,6 @@ public final class OpenGLRenderer implements MeshUploader {
         sceneDepthTexture = GL11.glGenTextures();
         postFramebuffer = GL30.glGenFramebuffers();
         postColorTexture = GL11.glGenTextures();
-        rayTracingTexture = GL11.glGenTextures();
 
         GL30.glBindFramebuffer(GL30.GL_FRAMEBUFFER, sceneFramebuffer);
         GL11.glBindTexture(GL11.GL_TEXTURE_2D, sceneColorTexture);
@@ -253,10 +245,6 @@ public final class OpenGLRenderer implements MeshUploader {
         if (status != GL30.GL_FRAMEBUFFER_COMPLETE) {
             logger.error("Post framebuffer incomplete with status {}", status);
         }
-        GL11.glBindTexture(GL11.GL_TEXTURE_2D, rayTracingTexture);
-        GL11.glTexImage2D(GL11.GL_TEXTURE_2D, 0, GL30.GL_RGBA16F, width, height, 0, GL11.GL_RGBA, GL11.GL_FLOAT, (ByteBuffer) null);
-        GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MIN_FILTER, GL11.GL_LINEAR);
-        GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MAG_FILTER, GL11.GL_LINEAR);
         GL30.glBindFramebuffer(GL30.GL_FRAMEBUFFER, 0);
         GL11.glViewport(0, 0, width, height);
         uniforms.updateProjection((float) width / (float) height);
@@ -267,7 +255,6 @@ public final class OpenGLRenderer implements MeshUploader {
     private RenderGraph buildRenderGraph() {
         return new RenderGraph()
             .addPass(new ScenePass())
-            .addPass(new RayTracingPass())
             .addPass(new PostProcessPass())
             .addPass(new ReadbackPass());
     }
@@ -366,8 +353,6 @@ public final class OpenGLRenderer implements MeshUploader {
         GL11.glBindTexture(GL11.GL_TEXTURE_2D, sceneColorTexture);
         GL13.glActiveTexture(GL13.GL_TEXTURE1);
         GL11.glBindTexture(GL11.GL_TEXTURE_2D, sceneDepthTexture);
-        GL13.glActiveTexture(GL13.GL_TEXTURE2);
-        GL11.glBindTexture(GL11.GL_TEXTURE_2D, rayTracingTexture);
         GL30.glBindVertexArray(screenQuadVao);
         GL11.glDrawArrays(GL11.GL_TRIANGLES, 0, 6);
         GL30.glBindVertexArray(0);
@@ -418,27 +403,6 @@ public final class OpenGLRenderer implements MeshUploader {
         postShaderProgram.setUniformFloat("uSsrStrength", settings.ssrStrength());
         postShaderProgram.setUniformFloat("uSsgiStrength", settings.ssgiStrength());
         postShaderProgram.setUniformFloat("uContactShadowStrength", settings.contactShadowStrength());
-        postShaderProgram.setUniformInt("uEnableRayTracing", settings.rayTracingEnabled() ? 1 : 0);
-        postShaderProgram.setUniformFloat("uRayTracingMix", settings.rayTracingMix());
-    }
-
-    private void renderRayTracingDemo() {
-        ScreenSpaceSettings settings = uniforms.screenSpaceSettings();
-        if (!settings.rayTracingEnabled()) {
-            return;
-        }
-        rayTracingProgram.bind();
-        rayTracingProgram.setUniformVec2("uResolution", new float[] { renderWidth, renderHeight });
-        float elapsed = (System.nanoTime() - startTimeNanos) / 1_000_000_000.0f;
-        rayTracingProgram.setUniformFloat("uTime", elapsed);
-        rayTracingProgram.setUniformInt("uMaxBounces", settings.rayTracingMaxBounces());
-        rayTracingProgram.setUniformInt("uEnableShadows", settings.rayTracingShadowsEnabled() ? 1 : 0);
-        rayTracingProgram.setUniformInt("uEnableReflections", settings.rayTracingReflectionsEnabled() ? 1 : 0);
-        GL42.glBindImageTexture(0, rayTracingTexture, 0, false, 0, GL42.GL_WRITE_ONLY, GL30.GL_RGBA16F);
-        int groupX = (renderWidth + 7) / 8;
-        int groupY = (renderHeight + 7) / 8;
-        rayTracingProgram.dispatch(groupX, groupY, 1);
-        GL42.glMemoryBarrier(GL42.GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
     }
 
     private void initScreenQuad() {
@@ -572,10 +536,6 @@ public final class OpenGLRenderer implements MeshUploader {
             GL11.glDeleteTextures(postColorTexture);
             postColorTexture = 0;
         }
-        if (rayTracingTexture != 0) {
-            GL11.glDeleteTextures(rayTracingTexture);
-            rayTracingTexture = 0;
-        }
     }
 
     private static final class ScenePass implements RenderPass {
@@ -599,18 +559,6 @@ public final class OpenGLRenderer implements MeshUploader {
         @Override
         public void execute(RenderGraphContext context) {
             context.renderer().renderPostProcess();
-        }
-    }
-
-    private static final class RayTracingPass implements RenderPass {
-        @Override
-        public String name() {
-            return "RayTracingPass";
-        }
-
-        @Override
-        public void execute(RenderGraphContext context) {
-            context.renderer().renderRayTracingDemo();
         }
     }
 
