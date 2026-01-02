@@ -6,7 +6,7 @@ import org.lwjgl.opengl.GL20;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-final class GPUMesh {
+public final class GPUMesh {
     private static final Logger logger = LoggerFactory.getLogger(GPUMesh.class);
 
     private MeshData lastUpload;
@@ -29,6 +29,10 @@ final class GPUMesh {
     }
 
     public void upload(MeshData snapshot) {
+        upload(snapshot, MeshUploadMode.STATIC_ONE_SHOT);
+    }
+
+    public void upload(MeshData snapshot, MeshUploadMode uploadMode) {
         lastUpload = snapshot;
         int vertexCount = snapshot.vertexCount();
         if (vertexCount == 0) {
@@ -53,9 +57,9 @@ final class GPUMesh {
         int required = positions.length / 3 * 14;
         ensureInterleavedCapacity(required);
         interleave(positions, normals, texCoords, tangents, bitangents, interleaved);
-        vertexBuffer.upload(interleaved, required);
+        vertexBuffer.upload(interleaved, required, uploadMode.bufferUsage());
         int[] indexData = snapshot.indices();
-        indexBuffer.upload(indexData, indexData.length);
+        indexBuffer.upload(indexData, indexData.length, uploadMode.bufferUsage());
         GL20.glEnableVertexAttribArray(0);
         GL20.glVertexAttribPointer(0, 3, GL11.GL_FLOAT, false, 14 * Float.BYTES, 0);
         GL20.glEnableVertexAttribArray(1);

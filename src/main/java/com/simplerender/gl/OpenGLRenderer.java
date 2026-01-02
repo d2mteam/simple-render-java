@@ -19,6 +19,12 @@ import com.simplerender.app.RenderFrameBridge;
 import com.simplerender.gl.rendergraph.RenderGraph;
 import com.simplerender.gl.rendergraph.RenderGraphContext;
 import com.simplerender.gl.rendergraph.RenderPass;
+import com.simplerender.gl.upload.DynamicVboUploader;
+import com.simplerender.gl.upload.EcsRenderDataDoubleBuffer;
+import com.simplerender.gl.upload.SparseTextureUploader;
+import com.simplerender.gl.upload.StaticMeshUploader;
+import com.simplerender.gl.upload.TextureStreamingUploader;
+import com.simplerender.gl.upload.UploadQueue;
 import java.nio.ByteBuffer;
 import java.util.Queue;
 import java.util.concurrent.Callable;
@@ -70,6 +76,7 @@ public final class OpenGLRenderer implements MeshUploader {
     private int screenQuadVbo;
     private int frameIndex;
     private long startTimeNanos;
+    private UploadQueue uploadQueue;
 
     public OpenGLRenderer() {
         this("default");
@@ -91,6 +98,7 @@ public final class OpenGLRenderer implements MeshUploader {
     public void render(SceneSnapshot snapshot) {
         ensureInitialized();
         drainPendingTasks();
+        uploadQueue.process();
         applyPendingShader();
         renderGraph.execute(new RenderGraphContext(this, snapshot));
         GL30.glBindFramebuffer(GL30.GL_FRAMEBUFFER, 0);
@@ -115,28 +123,62 @@ public final class OpenGLRenderer implements MeshUploader {
     @Override
     public MeshHandle uploadMesh(MeshData meshData) {
         ensureInitialized();
-        if (Thread.currentThread() == renderThread) {
-            return resourceManager.uploadMesh(meshData);
-        }
-        return submit(() -> resourceManager.uploadMesh(meshData)).join();
+        MeshHandle handle = resourceManager.createMeshHandle();
+        uploadQueue.enqueue(() -> resourceManager.uploadMesh(
+            handle,
+            meshData,
+            MeshUploadMode.STATIC_ONE_SHOT
+        ));
+        return handle;
     }
 
     @Override
     public MaterialHandle uploadMaterial(MaterialData materialData) {
         ensureInitialized();
-        if (Thread.currentThread() == renderThread) {
-            return resourceManager.uploadMaterial(materialData);
-        }
-        return submit(() -> resourceManager.uploadMaterial(materialData)).join();
+        MaterialHandle handle = resourceManager.createMaterialHandle();
+        uploadQueue.enqueue(() -> resourceManager.uploadMaterial(
+            handle,
+            materialData,
+            textureData -> {
+                TextureHandle textureHandle = resourceManager.createTextureHandle();
+                resourceManager.registerTexture(
+                    textureHandle,
+                    uploadQueue.textureStreamingUploader().upload(textureData)
+                );
+                return textureHandle;
+            },
+            resourceManager::uploadSampler
+        ));
+        return handle;
     }
 
     @Override
     public TextureHandle uploadTexture(TextureData textureData) {
         ensureInitialized();
-        if (Thread.currentThread() == renderThread) {
-            return resourceManager.uploadTexture(textureData);
-        }
-        return submit(() -> resourceManager.uploadTexture(textureData)).join();
+        TextureHandle handle = resourceManager.createTextureHandle();
+        uploadQueue.enqueue(() -> resourceManager.registerTexture(
+            handle,
+            uploadQueue.textureStreamingUploader().upload(textureData)
+        ));
+        return handle;
+    }
+
+    public TextureHandle uploadOpenWorldTexture(TextureData textureData) {
+        ensureInitialized();
+        TextureHandle handle = resourceManager.createTextureHandle();
+        uploadQueue.enqueue(() -> resourceManager.registerTexture(
+            handle,
+            uploadQueue.sparseTextureUploader().upload(textureData)
+        ));
+        return handle;
+    }
+
+    public void uploadEcsRenderData(ByteBuffer data) {
+        ensureInitialized();
+        ByteBuffer copy = BufferUtils.createByteBuffer(data.remaining());
+        ByteBuffer source = data.slice();
+        copy.put(source).flip();
+        uploadQueue.enqueue(() -> uploadQueue.ecsRenderDataDoubleBuffer().update(copy));
     }
 
     public void init() {
@@ -157,6 +199,13 @@ public final class OpenGLRenderer implements MeshUploader {
         }
         GLFW.glfwMakeContextCurrent(window);
         GL.createCapabilities();
+        uploadQueue = new UploadQueue(
+            new StaticMeshUploader(),
+            new TextureStreamingUploader(3),
+            new SparseTextureUploader(),
+            new DynamicVboUploader(),
+            new EcsRenderDataDoubleBuffer(1024)
+        );
         GL11.glEnable(GL11.GL_DEPTH_TEST);
         GL11.glClearColor(0.12f, 0.12f, 0.12f, 1.0f);
         uniforms = new RenderUniforms(1.0f);
