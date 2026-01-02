@@ -456,8 +456,8 @@ public final class OpenGLRenderer implements MeshUploader {
         postShaderProgram.setUniformInt("uEnableVignette", settings.vignetteEnabled() ? 1 : 0);
         postShaderProgram.setUniformInt("uEnableFilmGrain", settings.filmGrainEnabled() ? 1 : 0);
         postShaderProgram.setUniformInt("uEnableSsao", settings.ssaoEnabled() ? 1 : 0);
-        postShaderProgram.setUniformInt("uEnableSsr", settings.ssrEnabled() ? 1 : 0);
-        postShaderProgram.setUniformInt("uEnableSsgi", settings.ssgiEnabled() ? 1 : 0);
+        postShaderProgram.setUniformIntIfPresent("uEnableSsr", settings.ssrEnabled() ? 1 : 0);
+        postShaderProgram.setUniformIntIfPresent("uEnableSsgi", settings.ssgiEnabled() ? 1 : 0);
         postShaderProgram.setUniformInt("uEnableContactShadows", settings.contactShadowsEnabled() ? 1 : 0);
         postShaderProgram.setUniformFloat("uExposure", settings.exposure());
         postShaderProgram.setUniformFloat("uBloomStrength", settings.bloomStrength());
@@ -472,8 +472,8 @@ public final class OpenGLRenderer implements MeshUploader {
         postShaderProgram.setUniformVec2("uMotionBlurDir", settings.motionBlurDirection());
         postShaderProgram.setUniformFloat("uSsaoStrength", settings.ssaoStrength());
         postShaderProgram.setUniformFloat("uSsaoRadius", settings.ssaoRadius());
-        postShaderProgram.setUniformFloat("uSsrStrength", settings.ssrStrength());
-        postShaderProgram.setUniformFloat("uSsgiStrength", settings.ssgiStrength());
+        postShaderProgram.setUniformFloatIfPresent("uSsrStrength", settings.ssrStrength());
+        postShaderProgram.setUniformFloatIfPresent("uSsgiStrength", settings.ssgiStrength());
         postShaderProgram.setUniformFloat("uContactShadowStrength", settings.contactShadowStrength());
         postShaderProgram.setUniformInt("uEnableRayTracing", settings.rayTracingEnabled() ? 1 : 0);
         postShaderProgram.setUniformFloat("uRayTracingMix", settings.rayTracingMix());

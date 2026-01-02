@@ -94,6 +94,14 @@ final class ShaderProgram {
         GL20.glUniform1i(location, value);
     }
 
+    public void setUniformFloatIfPresent(String name, float value) {
+        int location = GL20.glGetUniformLocation(programId, name);
+        if (location < 0) {
+            return;
+        }
+        GL20.glUniform1f(location, value);
+    }
+
     public void setUniformIntIfPresent(String name, int value) {
         int location = GL20.glGetUniformLocation(programId, name);
         if (location < 0) {
