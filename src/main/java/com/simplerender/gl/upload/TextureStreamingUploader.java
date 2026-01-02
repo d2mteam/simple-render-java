@@ -1,25 +1,29 @@
-package com.simplerender.gl;
+package com.simplerender.gl.upload;
 
 import com.simplerender.asset.TextureData;
+import com.simplerender.gl.GpuTexture;
+import java.nio.ByteBuffer;
 import org.lwjgl.BufferUtils;
 import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL12;
+import org.lwjgl.opengl.GL21;
 import org.lwjgl.opengl.GL30;
 
-import java.nio.ByteBuffer;
+public final class TextureStreamingUploader {
+    private final int[] pboRing;
+    private int ringIndex;
 
-public final class GpuTexture {
-    private final int textureId;
-
-    GpuTexture(TextureData textureData) {
-        this(createTextureId(textureData));
+    public TextureStreamingUploader(int ringSize) {
+        if (ringSize <= 0) {
+            throw new IllegalArgumentException("Ring size must be positive");
+        }
+        this.pboRing = new int[ringSize];
+        for (int i = 0; i < ringSize; i++) {
+            pboRing[i] = GL21.glGenBuffers();
+        }
     }
 
-    public GpuTexture(int textureId) {
-        this.textureId = textureId;
-    }
-
-    private static int createTextureId(TextureData textureData) {
+    public GpuTexture upload(TextureData textureData) {
         int textureId = GL11.glGenTextures();
         GL11.glBindTexture(GL11.GL_TEXTURE_2D, textureId);
         GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MIN_FILTER, GL11.GL_LINEAR_MIPMAP_LINEAR);
@@ -27,9 +31,14 @@ public final class GpuTexture {
         GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_WRAP_S, GL12.GL_REPEAT);
         GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_WRAP_T, GL12.GL_REPEAT);
         GL11.glPixelStorei(GL11.GL_UNPACK_ALIGNMENT, 1);
+
+        int pboId = nextPbo();
+        GL21.glBindBuffer(GL21.GL_PIXEL_UNPACK_BUFFER, pboId);
         byte[] rgba = textureData.rgba();
         ByteBuffer buffer = BufferUtils.createByteBuffer(rgba.length);
         buffer.put(rgba).flip();
+        GL21.glBufferData(GL21.GL_PIXEL_UNPACK_BUFFER, buffer, GL21.GL_STREAM_DRAW);
+
         GL11.glTexImage2D(
             GL11.GL_TEXTURE_2D,
             0,
@@ -39,13 +48,16 @@ public final class GpuTexture {
             0,
             GL11.GL_RGBA,
             GL11.GL_UNSIGNED_BYTE,
-            buffer
+            (ByteBuffer) null
         );
+        GL21.glBindBuffer(GL21.GL_PIXEL_UNPACK_BUFFER, 0);
         GL30.glGenerateMipmap(GL11.GL_TEXTURE_2D);
-        return textureId;
+        return new GpuTexture(textureId);
     }
 
-    public int id() {
-        return textureId;
+    private int nextPbo() {
+        int pboId = pboRing[ringIndex];
+        ringIndex = (ringIndex + 1) % pboRing.length;
+        return pboId;
     }
 }
