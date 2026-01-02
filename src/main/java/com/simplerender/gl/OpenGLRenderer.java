@@ -19,12 +19,6 @@ import com.simplerender.app.RenderFrameBridge;
 import com.simplerender.gl.rendergraph.RenderGraph;
 import com.simplerender.gl.rendergraph.RenderGraphContext;
 import com.simplerender.gl.rendergraph.RenderPass;
-import com.simplerender.gl.upload.DynamicVboUploader;
-import com.simplerender.gl.upload.EcsRenderDataDoubleBuffer;
-import com.simplerender.gl.upload.SparseTextureUploader;
-import com.simplerender.gl.upload.StaticMeshUploader;
-import com.simplerender.gl.upload.TextureStreamingUploader;
-import com.simplerender.gl.upload.UploadQueue;
 import java.nio.ByteBuffer;
 import java.util.Queue;
 import java.util.concurrent.Callable;
@@ -54,6 +48,7 @@ public final class OpenGLRenderer implements MeshUploader {
     private final ComputeShaderProgram rayTracingProgram;
     private final GpuResourceManager resourceManager;
     private final RenderGraph renderGraph;
+    private final RenderGraph renderGraphWithRayTracing;
     private RenderUniforms uniforms;
     private boolean initialized;
     private String pendingShaderName;
@@ -76,7 +71,6 @@ public final class OpenGLRenderer implements MeshUploader {
     private int screenQuadVbo;
     private int frameIndex;
     private long startTimeNanos;
-    private UploadQueue uploadQueue;
 
     public OpenGLRenderer() {
         this("default");
@@ -88,7 +82,8 @@ public final class OpenGLRenderer implements MeshUploader {
         this.postShaderProgram = new ShaderProgram();
         this.rayTracingProgram = new ComputeShaderProgram();
         this.resourceManager = new GpuResourceManager();
-        this.renderGraph = buildRenderGraph();
+        this.renderGraph = buildRenderGraph(false);
+        this.renderGraphWithRayTracing = buildRenderGraph(true);
         String resolved = shaderName != null && !shaderName.isBlank() ? shaderName : "default";
         this.pendingShaderName = resolved;
         this.activeShaderName = resolved;
@@ -100,7 +95,10 @@ public final class OpenGLRenderer implements MeshUploader {
         drainPendingTasks();
         uploadQueue.process();
         applyPendingShader();
-        renderGraph.execute(new RenderGraphContext(this, snapshot));
+        RenderGraph graph = uniforms.screenSpaceSettings().rayTracingEnabled()
+            ? renderGraphWithRayTracing
+            : renderGraph;
+        graph.execute(new RenderGraphContext(this, snapshot));
         GL30.glBindFramebuffer(GL30.GL_FRAMEBUFFER, 0);
         GL11.glFlush();
     }
@@ -313,10 +311,13 @@ public final class OpenGLRenderer implements MeshUploader {
         shaderProgram.setUniformMat4("uProjection", uniforms.projectionMatrix());
     }
 
-    private RenderGraph buildRenderGraph() {
-        return new RenderGraph()
-            .addPass(new ScenePass())
-            .addPass(new RayTracingPass())
+    private RenderGraph buildRenderGraph(boolean includeRayTracing) {
+        RenderGraph graph = new RenderGraph()
+            .addPass(new ScenePass());
+        if (includeRayTracing) {
+            graph.addPass(new RayTracingPass());
+        }
+        return graph
             .addPass(new PostProcessPass())
             .addPass(new ReadbackPass());
     }
