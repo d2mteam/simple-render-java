@@ -13,6 +13,7 @@ final class RenderUniforms {
     private final float[] projectionMatrix;
     private final Light[] lights = new Light[MAX_LIGHTS];
     private int lightCount;
+    private final ScreenSpaceSettings screenSpaceSettings = new ScreenSpaceSettings();
 
     RenderUniforms(float aspect) {
         projectionMatrix = Matrix4f.perspective((float) Math.toRadians(60.0f), aspect, 0.1f, 100.0f);
@@ -36,6 +37,10 @@ final class RenderUniforms {
             throw new IllegalArgumentException("Light index out of range");
         }
         return lights[index];
+    }
+
+    public ScreenSpaceSettings screenSpaceSettings() {
+        return screenSpaceSettings;
     }
 
     public void updateView(Vector3f position, Vector3f forward, Vector3f up) {
