@@ -16,6 +16,9 @@ import com.simplerender.render.culling.FrustumCuller;
 import com.simplerender.render.pipeline.RenderPipeline;
 import com.simplerender.scene.SceneSnapshot;
 import com.simplerender.app.RenderFrameBridge;
+import com.simplerender.gl.rendergraph.RenderGraph;
+import com.simplerender.gl.rendergraph.RenderGraphContext;
+import com.simplerender.gl.rendergraph.RenderPass;
 import java.nio.ByteBuffer;
 import java.util.Queue;
 import java.util.concurrent.Callable;
@@ -42,6 +45,7 @@ public final class OpenGLRenderer implements MeshUploader {
     private final ShaderProgram shaderProgram;
     private final ShaderProgram postShaderProgram;
     private final GpuResourceManager resourceManager;
+    private final RenderGraph renderGraph;
     private RenderUniforms uniforms;
     private boolean initialized;
     private String pendingShaderName;
@@ -72,6 +76,7 @@ public final class OpenGLRenderer implements MeshUploader {
         this.shaderProgram = new ShaderProgram();
         this.postShaderProgram = new ShaderProgram();
         this.resourceManager = new GpuResourceManager();
+        this.renderGraph = buildRenderGraph();
         String resolved = shaderName != null && !shaderName.isBlank() ? shaderName : "default";
         this.pendingShaderName = resolved;
         this.activeShaderName = resolved;
@@ -82,58 +87,7 @@ public final class OpenGLRenderer implements MeshUploader {
         ensureInitialized();
         drainPendingTasks();
         applyPendingShader();
-        GL30.glBindFramebuffer(GL30.GL_FRAMEBUFFER, sceneFramebuffer);
-        GL11.glViewport(0, 0, renderWidth, renderHeight);
-        GL11.glClear(GL11.GL_COLOR_BUFFER_BIT | GL11.GL_DEPTH_BUFFER_BIT);
-        shaderProgram.bind();
-        uniforms.updateView(snapshot.camera().position(), snapshot.camera().forward(), snapshot.camera().up());
-        shaderProgram.setUniformMat4("uProjection", uniforms.projectionMatrix());
-        shaderProgram.setUniformMat4("uView", uniforms.viewMatrix());
-        applyLightUniforms();
-        pipeline.updateFrustum(uniforms.projectionMatrix(), uniforms.viewMatrix());
-        RenderItem[] renderItems = snapshot.renderItems();
-        for (int i = 0; i < renderItems.length; i++) {
-            RenderItem item = renderItems[i];
-            GPUMesh mesh = resourceManager.mesh(item.meshHandle());
-            GpuResourceManager.GpuMaterial material = resourceManager.material(item.materialHandle());
-            if (mesh == null || material == null) {
-                logger.error("Missing GPU resources for render item {}", i);
-                continue;
-            }
-            if (!pipeline.shouldRender(item, mesh.snapshot())) {
-                continue;
-            }
-            shaderProgram.setUniformMat4("uModel", item.transform().matrix());
-            shaderProgram.setUniformVec3("uBaseColor", material.baseColor());
-            bindTextureUnit(
-                GL13.GL_TEXTURE0,
-                resourceManager.texture(material.baseColorTexture()),
-                resourceManager.sampler(material.baseColorSampler())
-            );
-            bindTextureUnit(
-                GL13.GL_TEXTURE1,
-                resourceManager.texture(material.normalTexture()),
-                resourceManager.sampler(material.normalSampler())
-            );
-            bindTextureUnit(
-                GL13.GL_TEXTURE2,
-                resourceManager.texture(material.metallicRoughnessTexture()),
-                resourceManager.sampler(material.metallicRoughnessSampler())
-            );
-            bindTextureUnit(
-                GL13.GL_TEXTURE3,
-                resourceManager.texture(material.aoTexture()),
-                resourceManager.sampler(material.aoSampler())
-            );
-            bindTextureUnit(
-                GL13.GL_TEXTURE4,
-                resourceManager.texture(material.emissiveTexture()),
-                resourceManager.sampler(material.emissiveSampler())
-            );
-            mesh.draw();
-        }
-        renderPostProcess();
-        readBackFrame();
+        renderGraph.execute(new RenderGraphContext(this, snapshot));
         GL30.glBindFramebuffer(GL30.GL_FRAMEBUFFER, 0);
         GL11.glFlush();
     }
@@ -296,6 +250,13 @@ public final class OpenGLRenderer implements MeshUploader {
         shaderProgram.setUniformMat4("uProjection", uniforms.projectionMatrix());
     }
 
+    private RenderGraph buildRenderGraph() {
+        return new RenderGraph()
+            .addPass(new ScenePass())
+            .addPass(new PostProcessPass())
+            .addPass(new ReadbackPass());
+    }
+
     private void applyPendingShader() {
         if (!shaderProgram.isInitialized()) {
             return;
@@ -311,6 +272,59 @@ public final class OpenGLRenderer implements MeshUploader {
         shaderProgram.setUniformMat4("uProjection", uniforms.projectionMatrix());
         bindSamplers();
         activeShaderName = pendingShaderName;
+    }
+
+    private void renderScene(SceneSnapshot snapshot) {
+        GL30.glBindFramebuffer(GL30.GL_FRAMEBUFFER, sceneFramebuffer);
+        GL11.glViewport(0, 0, renderWidth, renderHeight);
+        GL11.glClear(GL11.GL_COLOR_BUFFER_BIT | GL11.GL_DEPTH_BUFFER_BIT);
+        shaderProgram.bind();
+        uniforms.updateView(snapshot.camera().position(), snapshot.camera().forward(), snapshot.camera().up());
+        shaderProgram.setUniformMat4("uProjection", uniforms.projectionMatrix());
+        shaderProgram.setUniformMat4("uView", uniforms.viewMatrix());
+        applyLightUniforms();
+        pipeline.updateFrustum(uniforms.projectionMatrix(), uniforms.viewMatrix());
+        RenderItem[] renderItems = snapshot.renderItems();
+        for (int i = 0; i < renderItems.length; i++) {
+            RenderItem item = renderItems[i];
+            GPUMesh mesh = resourceManager.mesh(item.meshHandle());
+            GpuResourceManager.GpuMaterial material = resourceManager.material(item.materialHandle());
+            if (mesh == null || material == null) {
+                logger.error("Missing GPU resources for render item {}", i);
+                continue;
+            }
+            if (!pipeline.shouldRender(item, mesh.snapshot())) {
+                continue;
+            }
+            shaderProgram.setUniformMat4("uModel", item.transform().matrix());
+            shaderProgram.setUniformVec3("uBaseColor", material.baseColor());
+            bindTextureUnit(
+                GL13.GL_TEXTURE0,
+                resourceManager.texture(material.baseColorTexture()),
+                resourceManager.sampler(material.baseColorSampler())
+            );
+            bindTextureUnit(
+                GL13.GL_TEXTURE1,
+                resourceManager.texture(material.normalTexture()),
+                resourceManager.sampler(material.normalSampler())
+            );
+            bindTextureUnit(
+                GL13.GL_TEXTURE2,
+                resourceManager.texture(material.metallicRoughnessTexture()),
+                resourceManager.sampler(material.metallicRoughnessSampler())
+            );
+            bindTextureUnit(
+                GL13.GL_TEXTURE3,
+                resourceManager.texture(material.aoTexture()),
+                resourceManager.sampler(material.aoSampler())
+            );
+            bindTextureUnit(
+                GL13.GL_TEXTURE4,
+                resourceManager.texture(material.emissiveTexture()),
+                resourceManager.sampler(material.emissiveSampler())
+            );
+            mesh.draw();
+        }
     }
 
     private void applyLightUniforms() {
@@ -519,6 +533,42 @@ public final class OpenGLRenderer implements MeshUploader {
         if (postColorTexture != 0) {
             GL11.glDeleteTextures(postColorTexture);
             postColorTexture = 0;
+        }
+    }
+
+    private static final class ScenePass implements RenderPass {
+        @Override
+        public String name() {
+            return "ScenePass";
+        }
+
+        @Override
+        public void execute(RenderGraphContext context) {
+            context.renderer().renderScene(context.snapshot());
+        }
+    }
+
+    private static final class PostProcessPass implements RenderPass {
+        @Override
+        public String name() {
+            return "PostProcessPass";
+        }
+
+        @Override
+        public void execute(RenderGraphContext context) {
+            context.renderer().renderPostProcess();
+        }
+    }
+
+    private static final class ReadbackPass implements RenderPass {
+        @Override
+        public String name() {
+            return "ReadbackPass";
+        }
+
+        @Override
+        public void execute(RenderGraphContext context) {
+            context.renderer().readBackFrame();
         }
     }
 }
