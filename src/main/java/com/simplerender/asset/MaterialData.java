@@ -25,11 +25,11 @@ public final class MaterialData {
     ) {
         this(
             baseColor,
-            toSlot(baseColorTexture),
-            toSlot(normalTexture),
-            toSlot(metallicRoughnessTexture),
-            toSlot(aoTexture),
-            toSlot(emissiveTexture)
+            toSlot(baseColorTexture, TextureColorSpace.SRGB),
+            toSlot(normalTexture, TextureColorSpace.LINEAR),
+            toSlot(metallicRoughnessTexture, TextureColorSpace.LINEAR),
+            toSlot(aoTexture, TextureColorSpace.LINEAR),
+            toSlot(emissiveTexture, TextureColorSpace.SRGB)
         );
     }
 
@@ -80,7 +80,7 @@ public final class MaterialData {
         return Optional.ofNullable(emissiveTexture);
     }
 
-    private static TextureSlot toSlot(TextureData textureData) {
-        return textureData == null ? null : new TextureSlot(textureData, null);
+    private static TextureSlot toSlot(TextureData textureData, TextureColorSpace colorSpace) {
+        return textureData == null ? null : new TextureSlot(textureData.withColorSpace(colorSpace), null);
     }
 }

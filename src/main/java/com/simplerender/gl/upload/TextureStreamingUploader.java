@@ -1,6 +1,7 @@
 package com.simplerender.gl.upload;
 
 import com.simplerender.asset.TextureData;
+import com.simplerender.asset.TextureColorSpace;
 import com.simplerender.gl.GpuTexture;
 import java.nio.ByteBuffer;
 import org.lwjgl.BufferUtils;
@@ -39,10 +40,13 @@ public final class TextureStreamingUploader {
         buffer.put(rgba).flip();
         GL21.glBufferData(GL21.GL_PIXEL_UNPACK_BUFFER, buffer, GL21.GL_STREAM_DRAW);
 
+        int internalFormat = textureData.colorSpace() == TextureColorSpace.SRGB
+            ? GL21.GL_SRGB8_ALPHA8
+            : GL11.GL_RGBA8;
         GL11.glTexImage2D(
             GL11.GL_TEXTURE_2D,
             0,
-            GL11.GL_RGBA8,
+            internalFormat,
             textureData.width(),
             textureData.height(),
             0,

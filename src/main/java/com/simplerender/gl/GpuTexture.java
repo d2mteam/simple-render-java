@@ -1,9 +1,11 @@
 package com.simplerender.gl;
 
 import com.simplerender.asset.TextureData;
+import com.simplerender.asset.TextureColorSpace;
 import org.lwjgl.BufferUtils;
 import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL12;
+import org.lwjgl.opengl.GL21;
 import org.lwjgl.opengl.GL30;
 
 import java.nio.ByteBuffer;
@@ -30,10 +32,13 @@ public final class GpuTexture {
         byte[] rgba = textureData.rgba();
         ByteBuffer buffer = BufferUtils.createByteBuffer(rgba.length);
         buffer.put(rgba).flip();
+        int internalFormat = textureData.colorSpace() == TextureColorSpace.SRGB
+            ? GL21.GL_SRGB8_ALPHA8
+            : GL11.GL_RGBA8;
         GL11.glTexImage2D(
             GL11.GL_TEXTURE_2D,
             0,
-            GL11.GL_RGBA8,
+            internalFormat,
             textureData.width(),
             textureData.height(),
             0,
