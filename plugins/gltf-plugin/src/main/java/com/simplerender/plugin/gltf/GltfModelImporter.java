@@ -41,7 +41,7 @@ public final class GltfModelImporter implements ModelImporter {
         try {
             GltfAsset asset = loadAsset(path);
             JsonObject root = asset.root();
-            byte[] bufferBytes = asset.buffer();
+            byte[][] bufferBytes = asset.buffers();
 
             JsonArray bufferViews = root.getAsJsonArray("bufferViews");
             JsonArray accessors = root.getAsJsonArray("accessors");
@@ -70,7 +70,7 @@ public final class GltfModelImporter implements ModelImporter {
         JsonObject root,
         JsonArray accessors,
         JsonArray bufferViews,
-        byte[] bufferBytes
+        byte[][] bufferBytes
     ) {
         if (!root.has("meshes")) {
             return List.of();
@@ -100,7 +100,7 @@ public final class GltfModelImporter implements ModelImporter {
         JsonObject root,
         JsonArray accessors,
         JsonArray bufferViews,
-        byte[] bufferBytes,
+        byte[][] bufferBytes,
         float[] parentTransform,
         List<PrimitiveMesh> primitives
     ) {
@@ -128,7 +128,7 @@ public final class GltfModelImporter implements ModelImporter {
         JsonObject root,
         JsonArray accessors,
         JsonArray bufferViews,
-        byte[] bufferBytes,
+        byte[][] bufferBytes,
         float[] transform,
         List<PrimitiveMesh> primitives
     ) {
@@ -266,10 +266,7 @@ public final class GltfModelImporter implements ModelImporter {
         }
         String json = Files.readString(path);
         JsonObject root = JsonParser.parseString(json).getAsJsonObject();
-        JsonArray buffers = root.getAsJsonArray("buffers");
-        JsonObject buffer = buffers.get(0).getAsJsonObject();
-        String uri = buffer.get("uri").getAsString();
-        byte[] bufferBytes = decodeUri(uri, path.getParent());
+        byte[][] bufferBytes = readBuffers(root, path.getParent());
         return new GltfAsset(root, bufferBytes);
     }
 
@@ -300,7 +297,13 @@ public final class GltfModelImporter implements ModelImporter {
         buffer.get(binBytes);
 
         JsonObject root = JsonParser.parseString(json).getAsJsonObject();
-        return new GltfAsset(root, binBytes);
+        byte[][] bufferBytes = readBuffers(root, path.getParent());
+        if (bufferBytes.length == 0) {
+            bufferBytes = new byte[][] {binBytes};
+        } else {
+            bufferBytes[0] = binBytes;
+        }
+        return new GltfAsset(root, bufferBytes);
     }
 
     private byte[] decodeUri(String uri, Path base) throws Exception {
@@ -311,10 +314,25 @@ public final class GltfModelImporter implements ModelImporter {
         return Files.readAllBytes(base.resolve(uri));
     }
 
+    private byte[][] readBuffers(JsonObject root, Path baseDir) throws Exception {
+        if (!root.has("buffers")) {
+            return new byte[0][];
+        }
+        JsonArray buffers = root.getAsJsonArray("buffers");
+        byte[][] bufferBytes = new byte[buffers.size()][];
+        for (int i = 0; i < buffers.size(); i++) {
+            JsonObject buffer = buffers.get(i).getAsJsonObject();
+            if (buffer.has("uri")) {
+                bufferBytes[i] = decodeUri(buffer.get("uri").getAsString(), baseDir);
+            }
+        }
+        return bufferBytes;
+    }
+
     private MaterialData loadMaterialByIndex(
         int materialIndex,
         JsonObject root,
-        byte[] bufferBytes,
+        byte[][] bufferBytes,
         Path baseDir,
         Map<Integer, MaterialData> materialCache
     ) {
@@ -454,7 +472,7 @@ public final class GltfModelImporter implements ModelImporter {
         return new SamplerData(minFilter, magFilter, wrapS, wrapT);
     }
 
-    private byte[] readImageBytes(JsonObject image, JsonObject root, byte[] bufferBytes, Path baseDir)
+    private byte[] readImageBytes(JsonObject image, JsonObject root, byte[][] bufferBytes, Path baseDir)
         throws Exception {
         if (image.has("uri")) {
             String uri = image.get("uri").getAsString();
@@ -466,13 +484,14 @@ public final class GltfModelImporter implements ModelImporter {
         }
         int bufferViewIndex = image.get("bufferView").getAsInt();
         JsonObject bufferView = root.getAsJsonArray("bufferViews").get(bufferViewIndex).getAsJsonObject();
+        byte[] viewBufferBytes = bufferBytesForView(bufferView, bufferBytes);
         int offset = bufferView.has("byteOffset") ? bufferView.get("byteOffset").getAsInt() : 0;
         int length = bufferView.get("byteLength").getAsInt();
-        if (offset + length > bufferBytes.length) {
+        if (offset + length > viewBufferBytes.length) {
             throw new IllegalArgumentException("glTF image bufferView exceeds buffer length");
         }
         byte[] imageBytes = new byte[length];
-        System.arraycopy(bufferBytes, offset, imageBytes, 0, length);
+        System.arraycopy(viewBufferBytes, offset, imageBytes, 0, length);
         return imageBytes;
     }
 
@@ -493,18 +512,18 @@ public final class GltfModelImporter implements ModelImporter {
         return new TextureData(width, height, rgba);
     }
 
-    private float[] readFloatVec3(JsonArray accessors, JsonArray bufferViews, byte[] bufferBytes, int accessorIndex) {
+    private float[] readFloatVec3(JsonArray accessors, JsonArray bufferViews, byte[][] bufferBytes, int accessorIndex) {
         return readFloatVec(accessors, bufferViews, bufferBytes, accessorIndex, 3);
     }
 
-    private float[] readFloatVec2(JsonArray accessors, JsonArray bufferViews, byte[] bufferBytes, int accessorIndex) {
+    private float[] readFloatVec2(JsonArray accessors, JsonArray bufferViews, byte[][] bufferBytes, int accessorIndex) {
         return readFloatVec(accessors, bufferViews, bufferBytes, accessorIndex, 2);
     }
 
     private float[] readFloatVec(
         JsonArray accessors,
         JsonArray bufferViews,
-        byte[] bufferBytes,
+        byte[][] bufferBytes,
         int accessorIndex,
         int components
     ) {
@@ -522,7 +541,7 @@ public final class GltfModelImporter implements ModelImporter {
             ? bufferView.get("byteStride").getAsInt()
             : componentSize * components;
 
-        ByteBuffer buffer = ByteBuffer.wrap(bufferBytes).order(ByteOrder.LITTLE_ENDIAN);
+        ByteBuffer buffer = ByteBuffer.wrap(bufferBytesForView(bufferView, bufferBytes)).order(ByteOrder.LITTLE_ENDIAN);
         float[] values = new float[count * components];
         for (int i = 0; i < count; i++) {
             int base = viewOffset + byteOffset + i * stride;
@@ -534,7 +553,7 @@ public final class GltfModelImporter implements ModelImporter {
         return values;
     }
 
-    private int[] readIndices(JsonArray accessors, JsonArray bufferViews, byte[] bufferBytes, int accessorIndex) {
+    private int[] readIndices(JsonArray accessors, JsonArray bufferViews, byte[][] bufferBytes, int accessorIndex) {
         JsonObject accessor = accessors.get(accessorIndex).getAsJsonObject();
         int count = accessor.get("count").getAsInt();
         int componentType = accessor.get("componentType").getAsInt();
@@ -544,7 +563,7 @@ public final class GltfModelImporter implements ModelImporter {
         JsonObject bufferView = bufferViews.get(bufferViewIndex).getAsJsonObject();
         int viewOffset = bufferView.has("byteOffset") ? bufferView.get("byteOffset").getAsInt() : 0;
 
-        ByteBuffer buffer = ByteBuffer.wrap(bufferBytes).order(ByteOrder.LITTLE_ENDIAN);
+        ByteBuffer buffer = ByteBuffer.wrap(bufferBytesForView(bufferView, bufferBytes)).order(ByteOrder.LITTLE_ENDIAN);
         int[] indices = new int[count];
         int base = viewOffset + byteOffset;
         for (int i = 0; i < count; i++) {
@@ -597,6 +616,14 @@ public final class GltfModelImporter implements ModelImporter {
         return (float) (value / max);
     }
 
+    private byte[] bufferBytesForView(JsonObject bufferView, byte[][] bufferBytes) {
+        int bufferIndex = bufferView.has("buffer") ? bufferView.get("buffer").getAsInt() : 0;
+        if (bufferIndex < 0 || bufferIndex >= bufferBytes.length || bufferBytes[bufferIndex] == null) {
+            throw new IllegalArgumentException("glTF buffer index out of range: " + bufferIndex);
+        }
+        return bufferBytes[bufferIndex];
+    }
+
     private static float[] defaultNormals(int vertexCount) {
         float[] normals = new float[vertexCount * 3];
         for (int i = 0; i < vertexCount; i++) {
@@ -618,6 +645,6 @@ public final class GltfModelImporter implements ModelImporter {
     private record PrimitiveMesh(MeshData meshData, int materialIndex) {
     }
 
-    private record GltfAsset(JsonObject root, byte[] buffer) {
+    private record GltfAsset(JsonObject root, byte[][] buffers) {
     }
 }
