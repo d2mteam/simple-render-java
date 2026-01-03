@@ -40,120 +40,240 @@ final class ScreenSpaceSettings {
         return toneMappingEnabled;
     }
 
+    void setToneMappingEnabled(boolean toneMappingEnabled) {
+        this.toneMappingEnabled = toneMappingEnabled;
+    }
+
     public boolean bloomEnabled() {
         return bloomEnabled;
+    }
+
+    void setBloomEnabled(boolean bloomEnabled) {
+        this.bloomEnabled = bloomEnabled;
     }
 
     public boolean colorGradingEnabled() {
         return colorGradingEnabled;
     }
 
+    void setColorGradingEnabled(boolean colorGradingEnabled) {
+        this.colorGradingEnabled = colorGradingEnabled;
+    }
+
     public boolean depthOfFieldEnabled() {
         return depthOfFieldEnabled;
+    }
+
+    void setDepthOfFieldEnabled(boolean depthOfFieldEnabled) {
+        this.depthOfFieldEnabled = depthOfFieldEnabled;
     }
 
     public boolean motionBlurEnabled() {
         return motionBlurEnabled;
     }
 
+    void setMotionBlurEnabled(boolean motionBlurEnabled) {
+        this.motionBlurEnabled = motionBlurEnabled;
+    }
+
     public boolean vignetteEnabled() {
         return vignetteEnabled;
+    }
+
+    void setVignetteEnabled(boolean vignetteEnabled) {
+        this.vignetteEnabled = vignetteEnabled;
     }
 
     public boolean filmGrainEnabled() {
         return filmGrainEnabled;
     }
 
+    void setFilmGrainEnabled(boolean filmGrainEnabled) {
+        this.filmGrainEnabled = filmGrainEnabled;
+    }
+
     public boolean ssaoEnabled() {
         return ssaoEnabled;
+    }
+
+    void setSsaoEnabled(boolean ssaoEnabled) {
+        this.ssaoEnabled = ssaoEnabled;
     }
 
     public boolean ssrEnabled() {
         return ssrEnabled;
     }
 
+    void setSsrEnabled(boolean ssrEnabled) {
+        this.ssrEnabled = ssrEnabled;
+    }
+
     public boolean ssgiEnabled() {
         return ssgiEnabled;
+    }
+
+    void setSsgiEnabled(boolean ssgiEnabled) {
+        this.ssgiEnabled = ssgiEnabled;
     }
 
     public boolean contactShadowsEnabled() {
         return contactShadowsEnabled;
     }
 
+    void setContactShadowsEnabled(boolean contactShadowsEnabled) {
+        this.contactShadowsEnabled = contactShadowsEnabled;
+    }
+
     public boolean rayTracingEnabled() {
         return rayTracingEnabled;
+    }
+
+    void setRayTracingEnabled(boolean rayTracingEnabled) {
+        this.rayTracingEnabled = rayTracingEnabled;
     }
 
     public boolean rayTracingShadowsEnabled() {
         return rayTracingShadowsEnabled;
     }
 
+    void setRayTracingShadowsEnabled(boolean rayTracingShadowsEnabled) {
+        this.rayTracingShadowsEnabled = rayTracingShadowsEnabled;
+    }
+
     public boolean rayTracingReflectionsEnabled() {
         return rayTracingReflectionsEnabled;
+    }
+
+    void setRayTracingReflectionsEnabled(boolean rayTracingReflectionsEnabled) {
+        this.rayTracingReflectionsEnabled = rayTracingReflectionsEnabled;
     }
 
     public float exposure() {
         return exposure;
     }
 
+    void setExposure(float exposure) {
+        this.exposure = exposure;
+    }
+
     public float bloomStrength() {
         return bloomStrength;
+    }
+
+    void setBloomStrength(float bloomStrength) {
+        this.bloomStrength = bloomStrength;
     }
 
     public float bloomThreshold() {
         return bloomThreshold;
     }
 
+    void setBloomThreshold(float bloomThreshold) {
+        this.bloomThreshold = bloomThreshold;
+    }
+
     public float colorGradeSaturation() {
         return colorGradeSaturation;
+    }
+
+    void setColorGradeSaturation(float colorGradeSaturation) {
+        this.colorGradeSaturation = colorGradeSaturation;
     }
 
     public float vignetteIntensity() {
         return vignetteIntensity;
     }
 
+    void setVignetteIntensity(float vignetteIntensity) {
+        this.vignetteIntensity = vignetteIntensity;
+    }
+
     public float filmGrainIntensity() {
         return filmGrainIntensity;
+    }
+
+    void setFilmGrainIntensity(float filmGrainIntensity) {
+        this.filmGrainIntensity = filmGrainIntensity;
     }
 
     public float dofFocus() {
         return dofFocus;
     }
 
+    void setDofFocus(float dofFocus) {
+        this.dofFocus = dofFocus;
+    }
+
     public float dofScale() {
         return dofScale;
+    }
+
+    void setDofScale(float dofScale) {
+        this.dofScale = dofScale;
     }
 
     public float motionBlurStrength() {
         return motionBlurStrength;
     }
 
+    void setMotionBlurStrength(float motionBlurStrength) {
+        this.motionBlurStrength = motionBlurStrength;
+    }
+
     public float ssaoStrength() {
         return ssaoStrength;
+    }
+
+    void setSsaoStrength(float ssaoStrength) {
+        this.ssaoStrength = ssaoStrength;
     }
 
     public float ssaoRadius() {
         return ssaoRadius;
     }
 
+    void setSsaoRadius(float ssaoRadius) {
+        this.ssaoRadius = ssaoRadius;
+    }
+
     public float ssrStrength() {
         return ssrStrength;
+    }
+
+    void setSsrStrength(float ssrStrength) {
+        this.ssrStrength = ssrStrength;
     }
 
     public float ssgiStrength() {
         return ssgiStrength;
     }
 
+    void setSsgiStrength(float ssgiStrength) {
+        this.ssgiStrength = ssgiStrength;
+    }
+
     public float contactShadowStrength() {
         return contactShadowStrength;
+    }
+
+    void setContactShadowStrength(float contactShadowStrength) {
+        this.contactShadowStrength = contactShadowStrength;
     }
 
     public float rayTracingMix() {
         return rayTracingMix;
     }
 
+    void setRayTracingMix(float rayTracingMix) {
+        this.rayTracingMix = rayTracingMix;
+    }
+
     public int rayTracingMaxBounces() {
         return rayTracingMaxBounces;
+    }
+
+    void setRayTracingMaxBounces(int rayTracingMaxBounces) {
+        this.rayTracingMaxBounces = rayTracingMaxBounces;
     }
 
     public float[] colorGradeTint() {
