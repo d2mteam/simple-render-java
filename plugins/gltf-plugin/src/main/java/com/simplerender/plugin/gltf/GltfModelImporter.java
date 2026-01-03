@@ -21,8 +21,11 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.Arrays;
+import java.util.ArrayList;
 import java.util.Base64;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 @Extension
 public final class GltfModelImporter implements ModelImporter {
@@ -42,98 +45,53 @@ public final class GltfModelImporter implements ModelImporter {
 
             JsonArray bufferViews = root.getAsJsonArray("bufferViews");
             JsonArray accessors = root.getAsJsonArray("accessors");
-            MeshParts meshParts = readSceneMeshes(root, accessors, bufferViews, bufferBytes);
-
-            float[] baseColor = new float[] {0.8f, 0.8f, 0.8f};
-            TextureSlot baseColorTexture = null;
-            TextureSlot normalTexture = null;
-            TextureSlot metallicRoughnessTexture = null;
-            TextureSlot aoTexture = null;
-            TextureSlot emissiveTexture = null;
-            if (root.has("materials")) {
-                JsonObject material = root.getAsJsonArray("materials").get(0).getAsJsonObject();
-                if (material.has("pbrMetallicRoughness")) {
-                    JsonObject pbr = material.getAsJsonObject("pbrMetallicRoughness");
-                    if (pbr.has("baseColorFactor")) {
-                        JsonArray color = pbr.getAsJsonArray("baseColorFactor");
-                        baseColor = new float[] {
-                            color.get(0).getAsFloat(),
-                            color.get(1).getAsFloat(),
-                            color.get(2).getAsFloat()
-                        };
-                    }
-                    if (pbr.has("baseColorTexture")) {
-                        int textureIndex = pbr.getAsJsonObject("baseColorTexture").get("index").getAsInt();
-                        baseColorTexture = loadTextureByIndex(textureIndex, root, bufferBytes, path.getParent());
-                    }
-                    if (pbr.has("metallicRoughnessTexture")) {
-                        int textureIndex = pbr.getAsJsonObject("metallicRoughnessTexture").get("index").getAsInt();
-                        metallicRoughnessTexture = loadTextureByIndex(textureIndex, root, bufferBytes, path.getParent());
-                    }
-                }
-                if (material.has("normalTexture")) {
-                    int textureIndex = material.getAsJsonObject("normalTexture").get("index").getAsInt();
-                    normalTexture = loadTextureByIndex(textureIndex, root, bufferBytes, path.getParent());
-                }
-                if (material.has("occlusionTexture")) {
-                    int textureIndex = material.getAsJsonObject("occlusionTexture").get("index").getAsInt();
-                    aoTexture = loadTextureByIndex(textureIndex, root, bufferBytes, path.getParent());
-                }
-                if (material.has("emissiveTexture")) {
-                    int textureIndex = material.getAsJsonObject("emissiveTexture").get("index").getAsInt();
-                    emissiveTexture = loadTextureByIndex(textureIndex, root, bufferBytes, path.getParent());
+            List<PrimitiveMesh> primitives = readScenePrimitives(root, accessors, bufferViews, bufferBytes);
+            List<ImportedPrimitive> importedPrimitives = new ArrayList<>();
+            if (!primitives.isEmpty()) {
+                Map<Integer, MaterialData> materialCache = new HashMap<>();
+                for (PrimitiveMesh primitive : primitives) {
+                    MaterialData material = loadMaterialByIndex(
+                        primitive.materialIndex(),
+                        root,
+                        bufferBytes,
+                        path.getParent(),
+                        materialCache
+                    );
+                    importedPrimitives.add(new ImportedPrimitive(primitive.meshData(), material));
                 }
             }
-
-            MeshData meshData = new MeshData(
-                meshParts.positions(),
-                meshParts.normals(),
-                meshParts.texCoords(),
-                meshParts.indices()
-            );
-            MaterialData materialData = new MaterialData(
-                baseColor,
-                baseColorTexture,
-                normalTexture,
-                metallicRoughnessTexture,
-                aoTexture,
-                emissiveTexture
-            );
-            return new ImportedModel(meshData, materialData);
+            return new ImportedModel(importedPrimitives);
         } catch (Exception e) {
             throw new IllegalStateException("Failed to import glTF: " + path, e);
         }
     }
 
-    private MeshParts readSceneMeshes(
+    private List<PrimitiveMesh> readScenePrimitives(
         JsonObject root,
         JsonArray accessors,
         JsonArray bufferViews,
         byte[] bufferBytes
     ) {
         if (!root.has("meshes")) {
-            return MeshParts.empty();
+            return List.of();
         }
         int sceneIndex = root.has("scene") ? root.get("scene").getAsInt() : 0;
         JsonArray scenes = root.has("scenes") ? root.getAsJsonArray("scenes") : null;
         JsonArray nodes = root.has("nodes") ? root.getAsJsonArray("nodes") : new JsonArray();
-        MeshParts combined = new MeshParts();
+        List<PrimitiveMesh> primitives = new ArrayList<>();
         if (scenes != null && sceneIndex < scenes.size()) {
             JsonObject scene = scenes.get(sceneIndex).getAsJsonObject();
             JsonArray rootNodes = scene.has("nodes") ? scene.getAsJsonArray("nodes") : new JsonArray();
             for (int i = 0; i < rootNodes.size(); i++) {
                 int nodeIndex = rootNodes.get(i).getAsInt();
-                traverseNode(nodeIndex, nodes, root, accessors, bufferViews, bufferBytes, Matrix4f.identity(), combined);
+                traverseNode(nodeIndex, nodes, root, accessors, bufferViews, bufferBytes, Matrix4f.identity(), primitives);
             }
         } else if (nodes.size() > 0) {
             for (int i = 0; i < nodes.size(); i++) {
-                traverseNode(i, nodes, root, accessors, bufferViews, bufferBytes, Matrix4f.identity(), combined);
+                traverseNode(i, nodes, root, accessors, bufferViews, bufferBytes, Matrix4f.identity(), primitives);
             }
         }
-        if (combined.vertexCount() == 0) {
-            return MeshParts.empty();
-        }
-        return combined;
+        return primitives;
     }
 
     private void traverseNode(
@@ -144,7 +102,7 @@ public final class GltfModelImporter implements ModelImporter {
         JsonArray bufferViews,
         byte[] bufferBytes,
         float[] parentTransform,
-        MeshParts combined
+        List<PrimitiveMesh> primitives
     ) {
         if (nodeIndex < 0 || nodeIndex >= nodes.size()) {
             return;
@@ -154,13 +112,13 @@ public final class GltfModelImporter implements ModelImporter {
         float[] worldTransform = Matrix4f.multiply(parentTransform, localTransform);
         if (node.has("mesh")) {
             int meshIndex = node.get("mesh").getAsInt();
-            appendMesh(meshIndex, root, accessors, bufferViews, bufferBytes, worldTransform, combined);
+            appendMesh(meshIndex, root, accessors, bufferViews, bufferBytes, worldTransform, primitives);
         }
         if (node.has("children")) {
             JsonArray children = node.getAsJsonArray("children");
             for (int i = 0; i < children.size(); i++) {
                 int childIndex = children.get(i).getAsInt();
-                traverseNode(childIndex, nodes, root, accessors, bufferViews, bufferBytes, worldTransform, combined);
+                traverseNode(childIndex, nodes, root, accessors, bufferViews, bufferBytes, worldTransform, primitives);
             }
         }
     }
@@ -172,7 +130,7 @@ public final class GltfModelImporter implements ModelImporter {
         JsonArray bufferViews,
         byte[] bufferBytes,
         float[] transform,
-        MeshParts combined
+        List<PrimitiveMesh> primitives
     ) {
         JsonArray meshes = root.getAsJsonArray("meshes");
         if (meshIndex < 0 || meshIndex >= meshes.size()) {
@@ -190,6 +148,7 @@ public final class GltfModelImporter implements ModelImporter {
             int normalAccessorIndex = attributes.has("NORMAL") ? attributes.get("NORMAL").getAsInt() : -1;
             int texCoordAccessorIndex = attributes.has("TEXCOORD_0") ? attributes.get("TEXCOORD_0").getAsInt() : -1;
             int indexAccessorIndex = primitive.has("indices") ? primitive.get("indices").getAsInt() : -1;
+            int materialIndex = primitive.has("material") ? primitive.get("material").getAsInt() : -1;
             float[] positions = readFloatVec3(accessors, bufferViews, bufferBytes, positionAccessorIndex);
             float[] normals = normalAccessorIndex >= 0
                 ? readFloatVec3(accessors, bufferViews, bufferBytes, normalAccessorIndex)
@@ -201,7 +160,8 @@ public final class GltfModelImporter implements ModelImporter {
             int[] indices = indexAccessorIndex >= 0
                 ? readIndices(accessors, bufferViews, bufferBytes, indexAccessorIndex)
                 : sequentialIndices(positions.length / 3);
-            combined.append(positions, normals, texCoords, indices);
+            MeshData meshData = new MeshData(positions, normals, texCoords, indices);
+            primitives.add(new PrimitiveMesh(meshData, materialIndex));
         }
     }
 
@@ -347,6 +307,80 @@ public final class GltfModelImporter implements ModelImporter {
         return Files.readAllBytes(base.resolve(uri));
     }
 
+    private MaterialData loadMaterialByIndex(
+        int materialIndex,
+        JsonObject root,
+        byte[] bufferBytes,
+        Path baseDir,
+        Map<Integer, MaterialData> materialCache
+    ) {
+        if (materialIndex >= 0 && materialCache.containsKey(materialIndex)) {
+            return materialCache.get(materialIndex);
+        }
+        if (!root.has("materials") || materialIndex < 0 || materialIndex >= root.getAsJsonArray("materials").size()) {
+            return defaultMaterial();
+        }
+        JsonObject material = root.getAsJsonArray("materials").get(materialIndex).getAsJsonObject();
+        float[] baseColor = new float[] {0.8f, 0.8f, 0.8f};
+        TextureSlot baseColorTexture = null;
+        TextureSlot normalTexture = null;
+        TextureSlot metallicRoughnessTexture = null;
+        TextureSlot aoTexture = null;
+        TextureSlot emissiveTexture = null;
+        if (material.has("pbrMetallicRoughness")) {
+            JsonObject pbr = material.getAsJsonObject("pbrMetallicRoughness");
+            if (pbr.has("baseColorFactor")) {
+                JsonArray color = pbr.getAsJsonArray("baseColorFactor");
+                baseColor = new float[] {
+                    color.get(0).getAsFloat(),
+                    color.get(1).getAsFloat(),
+                    color.get(2).getAsFloat()
+                };
+            }
+            if (pbr.has("baseColorTexture")) {
+                int textureIndex = pbr.getAsJsonObject("baseColorTexture").get("index").getAsInt();
+                baseColorTexture = loadTextureByIndex(textureIndex, root, bufferBytes, baseDir);
+            }
+            if (pbr.has("metallicRoughnessTexture")) {
+                int textureIndex = pbr.getAsJsonObject("metallicRoughnessTexture").get("index").getAsInt();
+                metallicRoughnessTexture = loadTextureByIndex(textureIndex, root, bufferBytes, baseDir);
+            }
+        }
+        if (material.has("normalTexture")) {
+            int textureIndex = material.getAsJsonObject("normalTexture").get("index").getAsInt();
+            normalTexture = loadTextureByIndex(textureIndex, root, bufferBytes, baseDir);
+        }
+        if (material.has("occlusionTexture")) {
+            int textureIndex = material.getAsJsonObject("occlusionTexture").get("index").getAsInt();
+            aoTexture = loadTextureByIndex(textureIndex, root, bufferBytes, baseDir);
+        }
+        if (material.has("emissiveTexture")) {
+            int textureIndex = material.getAsJsonObject("emissiveTexture").get("index").getAsInt();
+            emissiveTexture = loadTextureByIndex(textureIndex, root, bufferBytes, baseDir);
+        }
+        MaterialData materialData = new MaterialData(
+            baseColor,
+            baseColorTexture,
+            normalTexture,
+            metallicRoughnessTexture,
+            aoTexture,
+            emissiveTexture
+        );
+        materialCache.put(materialIndex, materialData);
+        return materialData;
+    }
+
+    private MaterialData defaultMaterial() {
+        return new MaterialData(
+            new float[] {0.8f, 0.8f, 0.8f},
+            (TextureSlot) null,
+            null,
+            null,
+            null,
+            null
+        );
+    }
+
     private TextureSlot loadTextureByIndex(int textureIndex, JsonObject root, byte[] bufferBytes, Path baseDir) {
         if (!root.has("textures") || !root.has("images")) {
             logger.warn("glTF texture referenced but textures/images arrays are missing");
@@ -440,42 +474,42 @@ public final class GltfModelImporter implements ModelImporter {
     }
 
     private float[] readFloatVec3(JsonArray accessors, JsonArray bufferViews, byte[] bufferBytes, int accessorIndex) {
-        JsonObject accessor = accessors.get(accessorIndex).getAsJsonObject();
-        int count = accessor.get("count").getAsInt();
-        int bufferViewIndex = accessor.get("bufferView").getAsInt();
-        int byteOffset = accessor.has("byteOffset") ? accessor.get("byteOffset").getAsInt() : 0;
-
-        JsonObject bufferView = bufferViews.get(bufferViewIndex).getAsJsonObject();
-        int viewOffset = bufferView.has("byteOffset") ? bufferView.get("byteOffset").getAsInt() : 0;
-        int stride = bufferView.has("byteStride") ? bufferView.get("byteStride").getAsInt() : 12;
-
-        ByteBuffer buffer = ByteBuffer.wrap(bufferBytes).order(ByteOrder.LITTLE_ENDIAN);
-        float[] values = new float[count * 3];
-        for (int i = 0; i < count; i++) {
-            int base = viewOffset + byteOffset + i * stride;
-            values[i * 3] = buffer.getFloat(base);
-            values[i * 3 + 1] = buffer.getFloat(base + 4);
-            values[i * 3 + 2] = buffer.getFloat(base + 8);
-        }
-        return values;
+        return readFloatVec(accessors, bufferViews, bufferBytes, accessorIndex, 3);
     }
 
     private float[] readFloatVec2(JsonArray accessors, JsonArray bufferViews, byte[] bufferBytes, int accessorIndex) {
+        return readFloatVec(accessors, bufferViews, bufferBytes, accessorIndex, 2);
+    }
+
+    private float[] readFloatVec(
+        JsonArray accessors,
+        JsonArray bufferViews,
+        byte[] bufferBytes,
+        int accessorIndex,
+        int components
+    ) {
         JsonObject accessor = accessors.get(accessorIndex).getAsJsonObject();
         int count = accessor.get("count").getAsInt();
+        int componentType = accessor.get("componentType").getAsInt();
+        boolean normalized = accessor.has("normalized") && accessor.get("normalized").getAsBoolean();
         int bufferViewIndex = accessor.get("bufferView").getAsInt();
         int byteOffset = accessor.has("byteOffset") ? accessor.get("byteOffset").getAsInt() : 0;
 
         JsonObject bufferView = bufferViews.get(bufferViewIndex).getAsJsonObject();
         int viewOffset = bufferView.has("byteOffset") ? bufferView.get("byteOffset").getAsInt() : 0;
-        int stride = bufferView.has("byteStride") ? bufferView.get("byteStride").getAsInt() : 8;
+        int componentSize = componentSize(componentType);
+        int stride = bufferView.has("byteStride")
+            ? bufferView.get("byteStride").getAsInt()
+            : componentSize * components;
 
         ByteBuffer buffer = ByteBuffer.wrap(bufferBytes).order(ByteOrder.LITTLE_ENDIAN);
-        float[] values = new float[count * 2];
+        float[] values = new float[count * components];
         for (int i = 0; i < count; i++) {
             int base = viewOffset + byteOffset + i * stride;
-            values[i * 2] = buffer.getFloat(base);
-            values[i * 2 + 1] = buffer.getFloat(base + 4);
+            for (int c = 0; c < components; c++) {
+                int offset = base + c * componentSize;
+                values[i * components + c] = readComponentAsFloat(buffer, offset, componentType, normalized);
+            }
         }
         return values;
     }
@@ -496,6 +530,7 @@ public final class GltfModelImporter implements ModelImporter {
         for (int i = 0; i < count; i++) {
             int offset = base + i * componentSize(componentType);
             indices[i] = switch (componentType) {
+                case 5121 -> buffer.get(offset) & 0xFF;
                 case 5123 -> buffer.getShort(offset) & 0xFFFF;
                 case 5125 -> buffer.getInt(offset);
                 default -> throw new IllegalArgumentException("Unsupported index component type");
@@ -506,10 +541,40 @@ public final class GltfModelImporter implements ModelImporter {
 
     private int componentSize(int componentType) {
         return switch (componentType) {
+            case 5120 -> 1;
+            case 5121 -> 1;
+            case 5122 -> 2;
             case 5123 -> 2;
             case 5125 -> 4;
+            case 5126 -> 4;
             default -> throw new IllegalArgumentException("Unsupported component type");
         };
+    }
+
+    private float readComponentAsFloat(ByteBuffer buffer, int offset, int componentType, boolean normalized) {
+        return switch (componentType) {
+            case 5120 -> normalizeSigned(buffer.get(offset), normalized, 127.0f);
+            case 5121 -> normalizeUnsigned(buffer.get(offset) & 0xFF, normalized, 255.0f);
+            case 5122 -> normalizeSigned(buffer.getShort(offset), normalized, 32767.0f);
+            case 5123 -> normalizeUnsigned(buffer.getShort(offset) & 0xFFFF, normalized, 65535.0f);
+            case 5125 -> normalizeUnsigned(Integer.toUnsignedLong(buffer.getInt(offset)), normalized, 4294967295.0f);
+            case 5126 -> buffer.getFloat(offset);
+            default -> throw new IllegalArgumentException("Unsupported component type");
+        };
+    }
+
+    private float normalizeSigned(int value, boolean normalized, float max) {
+        if (!normalized) {
+            return value;
+        }
+        return Math.max(value / max, -1.0f);
+    }
+
+    private float normalizeUnsigned(long value, boolean normalized, float max) {
+        if (!normalized) {
+            return value;
+        }
+        return (float) (value / max);
     }
 
     private static float[] defaultNormals(int vertexCount) {
@@ -530,105 +595,7 @@ public final class GltfModelImporter implements ModelImporter {
         return indices;
     }
 
-    private static final class MeshParts {
-        private float[] positions;
-        private float[] normals;
-        private float[] texCoords;
-        private int[] indices;
-        private int vertexCount;
-        private int indexCount;
-
-        static MeshParts empty() {
-            return new MeshParts();
-        }
-
-        int vertexCount() {
-            return vertexCount;
-        }
-
-        float[] positions() {
-            return positions == null ? new float[0] : Arrays.copyOf(positions, vertexCount * 3);
-        }
-
-        float[] normals() {
-            return normals == null ? new float[0] : Arrays.copyOf(normals, vertexCount * 3);
-        }
-
-        float[] texCoords() {
-            return texCoords == null ? new float[0] : Arrays.copyOf(texCoords, vertexCount * 2);
-        }
-
-        int[] indices() {
-            return indices == null ? new int[0] : Arrays.copyOf(indices, indexCount);
-        }
-
-        void append(float[] newPositions, float[] newNormals, float[] newTexCoords, int[] newIndices) {
-            int newVertices = newPositions.length / 3;
-            ensureVertexCapacity(vertexCount + newVertices);
-            System.arraycopy(newPositions, 0, positions, vertexCount * 3, newPositions.length);
-            if (normals == null) {
-                normals = new float[positions.length];
-            }
-            if (newNormals != null && newNormals.length == newPositions.length) {
-                System.arraycopy(newNormals, 0, normals, vertexCount * 3, newNormals.length);
-            } else {
-                float[] fallback = defaultNormals(newVertices);
-                System.arraycopy(fallback, 0, normals, vertexCount * 3, fallback.length);
-            }
-            ensureTexCoordCapacity(vertexCount + newVertices);
-            if (newTexCoords != null && newTexCoords.length == newVertices * 2) {
-                System.arraycopy(newTexCoords, 0, texCoords, vertexCount * 2, newTexCoords.length);
-            } else {
-                for (int i = 0; i < newVertices; i++) {
-                    int base = (vertexCount + i) * 2;
-                    texCoords[base] = 0.5f;
-                    texCoords[base + 1] = 0.5f;
-                }
-            }
-            ensureIndexCapacity(indexCount + newIndices.length);
-            for (int i = 0; i < newIndices.length; i++) {
-                indices[indexCount + i] = newIndices[i] + vertexCount;
-            }
-            indexCount += newIndices.length;
-            vertexCount += newVertices;
-        }
-
-        private void ensureVertexCapacity(int requiredVertices) {
-            int requiredLength = requiredVertices * 3;
-            if (positions == null) {
-                positions = new float[requiredLength];
-                normals = new float[requiredLength];
-                return;
-            }
-            if (positions.length < requiredLength) {
-                int newLength = Math.max(requiredLength, positions.length * 2);
-                positions = Arrays.copyOf(positions, newLength);
-                normals = Arrays.copyOf(normals, newLength);
-            }
-        }
-
-        private void ensureTexCoordCapacity(int requiredVertices) {
-            int requiredLength = requiredVertices * 2;
-            if (texCoords == null) {
-                texCoords = new float[requiredLength];
-                return;
-            }
-            if (texCoords.length < requiredLength) {
-                int newLength = Math.max(requiredLength, texCoords.length * 2);
-                texCoords = Arrays.copyOf(texCoords, newLength);
-            }
-        }
-
-        private void ensureIndexCapacity(int requiredIndices) {
-            if (indices == null) {
-                indices = new int[requiredIndices];
-                return;
-            }
-            if (indices.length < requiredIndices) {
-                int newLength = Math.max(requiredIndices, indices.length * 2);
-                indices = Arrays.copyOf(indices, newLength);
-            }
-        }
+    private record PrimitiveMesh(MeshData meshData, int materialIndex) {
     }
 
     private record GltfAsset(JsonObject root, byte[] buffer) {

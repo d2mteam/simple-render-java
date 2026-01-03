@@ -36,7 +36,7 @@ public final class Scene {
         CameraController cameraController = new CameraController();
         List<RenderItem> renderItems = new ArrayList<>();
         if (importedModel.isPresent()) {
-            renderItems.add(createFromImported(meshUploader, importedModel.get()));
+            renderItems.addAll(createFromImported(meshUploader, importedModel.get()));
             logger.info("Scene bootstrapped with imported model");
         } else {
             logger.info("Scene bootstrapped with no renderable objects");
@@ -77,22 +77,30 @@ public final class Scene {
     }
 
     public int addImportedObject(MeshUploader meshUploader, ModelImporter.ImportedModel model) {
-        RenderItem item = createFromImported(meshUploader, model);
-        renderItems.add(item);
-        int index = renderItems.size() - 1;
-        logger.info("Added imported object at index {}", index);
-        return index;
+        int startIndex = renderItems.size();
+        List<RenderItem> items = createFromImported(meshUploader, model);
+        if (items.isEmpty()) {
+            logger.warn("Imported model contained no renderable primitives");
+            return -1;
+        }
+        renderItems.addAll(items);
+        logger.info("Added imported object(s) at index {}", startIndex);
+        return startIndex;
     }
 
     public int objectCount() {
         return renderItems.size();
     }
 
-    private static RenderItem createFromImported(MeshUploader meshUploader, ModelImporter.ImportedModel model) {
-        return new RenderItem(
-            meshUploader.uploadMesh(model.meshData()),
-            meshUploader.uploadMaterial(model.materialData()),
-            new Transform()
-        );
+    private static List<RenderItem> createFromImported(MeshUploader meshUploader, ModelImporter.ImportedModel model) {
+        List<RenderItem> items = new ArrayList<>();
+        for (ModelImporter.ImportedPrimitive primitive : model.primitives()) {
+            items.add(new RenderItem(
+                meshUploader.uploadMesh(primitive.meshData()),
+                meshUploader.uploadMaterial(primitive.materialData()),
+                new Transform()
+            ));
+        }
+        return items;
     }
 }
