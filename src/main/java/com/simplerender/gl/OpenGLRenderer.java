@@ -31,6 +31,7 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Consumer;
 import org.lwjgl.glfw.GLFW;
 import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL;
@@ -556,6 +557,22 @@ public final class OpenGLRenderer implements MeshUploader {
             this.frameBridge = frameBridge;
         } else {
             submit(() -> this.frameBridge = frameBridge);
+        }
+    }
+
+    public void updateScreenSpaceSettings(Consumer<ScreenSpaceSettings> updater) {
+        if (updater == null) {
+            return;
+        }
+        Runnable apply = () -> {
+            if (uniforms != null) {
+                updater.accept(uniforms.screenSpaceSettings());
+            }
+        };
+        if (Thread.currentThread() == renderThread) {
+            apply.run();
+        } else {
+            submit(apply);
         }
     }
 
