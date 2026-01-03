@@ -72,7 +72,7 @@ public final class ModelImportService {
     public Optional<ModelImporter.ImportedModel> importModel(Path path) {
         String extension = extension(path);
         logger.info("Attempting to import model {} (extension: {})", path, extension);
-        List<ModelImporter> importers = pluginManager.getExtensions(ModelImporter.class);
+        List<ModelImporter> importers = resolveImporters();
         for (ModelImporter importer : importers) {
             if (importerSupports(importer, extension)) {
                 logger.info("Using importer {} for {}", importer.getClass().getSimpleName(), path);
