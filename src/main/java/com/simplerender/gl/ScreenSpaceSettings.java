@@ -12,9 +12,9 @@ final class ScreenSpaceSettings {
     private boolean ssrEnabled;
     private boolean ssgiEnabled;
     private boolean contactShadowsEnabled;
-    private boolean rayTracingEnabled = true;
-    private boolean rayTracingShadowsEnabled = true;
-    private boolean rayTracingReflectionsEnabled = true;
+    private boolean rayTracingEnabled;
+    private boolean rayTracingShadowsEnabled;
+    private boolean rayTracingReflectionsEnabled;
 
     private float exposure = 1.0f;
     private float bloomStrength = 0.35f;
@@ -30,7 +30,7 @@ final class ScreenSpaceSettings {
     private float ssrStrength = 0.35f;
     private float ssgiStrength = 0.35f;
     private float contactShadowStrength = 0.5f;
-    private float rayTracingMix = 0.85f;
+    private float rayTracingMix = 0.0f;
     private int rayTracingMaxBounces = 2;
 
     private final float[] colorGradeTint = new float[] { 1.0f, 1.0f, 1.0f };
