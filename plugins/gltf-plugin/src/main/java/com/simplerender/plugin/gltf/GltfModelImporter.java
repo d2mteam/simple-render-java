@@ -7,6 +7,7 @@ import com.simplerender.asset.MaterialData;
 import com.simplerender.asset.MeshData;
 import com.simplerender.asset.SamplerData;
 import com.simplerender.asset.TextureData;
+import com.simplerender.asset.TextureColorSpace;
 import com.simplerender.asset.TextureSlot;
 import com.simplerender.asset.plugin.ModelImporter;
 import com.simplerender.math.Matrix4f;
@@ -363,32 +364,67 @@ public final class GltfModelImporter implements ModelImporter {
                 JsonObject textureInfo = pbr.getAsJsonObject("baseColorTexture");
                 int textureIndex = textureInfo.get("index").getAsInt();
                 int texCoord = textureInfo.has("texCoord") ? textureInfo.get("texCoord").getAsInt() : 0;
-                baseColorTexture = loadTextureByIndex(textureIndex, texCoord, root, bufferBytes, baseDir);
+                baseColorTexture = loadTextureByIndex(
+                    textureIndex,
+                    texCoord,
+                    TextureColorSpace.SRGB,
+                    root,
+                    bufferBytes,
+                    baseDir
+                );
             }
             if (pbr.has("metallicRoughnessTexture")) {
                 JsonObject textureInfo = pbr.getAsJsonObject("metallicRoughnessTexture");
                 int textureIndex = textureInfo.get("index").getAsInt();
                 int texCoord = textureInfo.has("texCoord") ? textureInfo.get("texCoord").getAsInt() : 0;
-                metallicRoughnessTexture = loadTextureByIndex(textureIndex, texCoord, root, bufferBytes, baseDir);
+                metallicRoughnessTexture = loadTextureByIndex(
+                    textureIndex,
+                    texCoord,
+                    TextureColorSpace.LINEAR,
+                    root,
+                    bufferBytes,
+                    baseDir
+                );
             }
         }
         if (material.has("normalTexture")) {
             JsonObject textureInfo = material.getAsJsonObject("normalTexture");
             int textureIndex = textureInfo.get("index").getAsInt();
             int texCoord = textureInfo.has("texCoord") ? textureInfo.get("texCoord").getAsInt() : 0;
-            normalTexture = loadTextureByIndex(textureIndex, texCoord, root, bufferBytes, baseDir);
+            normalTexture = loadTextureByIndex(
+                textureIndex,
+                texCoord,
+                TextureColorSpace.LINEAR,
+                root,
+                bufferBytes,
+                baseDir
+            );
         }
         if (material.has("occlusionTexture")) {
             JsonObject textureInfo = material.getAsJsonObject("occlusionTexture");
             int textureIndex = textureInfo.get("index").getAsInt();
             int texCoord = textureInfo.has("texCoord") ? textureInfo.get("texCoord").getAsInt() : 0;
-            aoTexture = loadTextureByIndex(textureIndex, texCoord, root, bufferBytes, baseDir);
+            aoTexture = loadTextureByIndex(
+                textureIndex,
+                texCoord,
+                TextureColorSpace.LINEAR,
+                root,
+                bufferBytes,
+                baseDir
+            );
         }
         if (material.has("emissiveTexture")) {
             JsonObject textureInfo = material.getAsJsonObject("emissiveTexture");
             int textureIndex = textureInfo.get("index").getAsInt();
             int texCoord = textureInfo.has("texCoord") ? textureInfo.get("texCoord").getAsInt() : 0;
-            emissiveTexture = loadTextureByIndex(textureIndex, texCoord, root, bufferBytes, baseDir);
+            emissiveTexture = loadTextureByIndex(
+                textureIndex,
+                texCoord,
+                TextureColorSpace.SRGB,
+                root,
+                bufferBytes,
+                baseDir
+            );
         }
         MaterialData materialData = new MaterialData(
             baseColor,
@@ -416,6 +452,7 @@ public final class GltfModelImporter implements ModelImporter {
     private TextureSlot loadTextureByIndex(
         int textureIndex,
         int texCoord,
+        TextureColorSpace colorSpace,
         JsonObject root,
         byte[][] bufferBytes,
         Path baseDir
@@ -447,7 +484,7 @@ public final class GltfModelImporter implements ModelImporter {
                 return null;
             }
             logger.info("Loaded glTF texture image {}", sourceIndex);
-            return new TextureSlot(buildTextureData(bufferedImage), samplerData, texCoord);
+            return new TextureSlot(buildTextureData(bufferedImage, colorSpace), samplerData, texCoord);
         } catch (Exception e) {
             logger.warn("Failed to load glTF texture image {}", sourceIndex, e);
             return null;
@@ -495,7 +532,7 @@ public final class GltfModelImporter implements ModelImporter {
         return imageBytes;
     }
 
-    private TextureData buildTextureData(BufferedImage image) {
+    private TextureData buildTextureData(BufferedImage image, TextureColorSpace colorSpace) {
         int width = image.getWidth();
         int height = image.getHeight();
         byte[] rgba = new byte[width * height * 4];
@@ -509,7 +546,7 @@ public final class GltfModelImporter implements ModelImporter {
                 rgba[index++] = (byte) ((argb >> 24) & 0xFF);
             }
         }
-        return new TextureData(width, height, rgba);
+        return new TextureData(width, height, rgba, colorSpace);
     }
 
     private float[] readFloatVec3(JsonArray accessors, JsonArray bufferViews, byte[][] bufferBytes, int accessorIndex) {
