@@ -1,6 +1,6 @@
 package com.simplerender.gl;
 
-final class ScreenSpaceSettings {
+public final class ScreenSpaceSettings {
     private boolean toneMappingEnabled = true;
     private boolean bloomEnabled = true;
     private boolean colorGradingEnabled = true;
@@ -33,14 +33,14 @@ final class ScreenSpaceSettings {
     private float rayTracingMix = 0.85f;
     private int rayTracingMaxBounces = 2;
 
-    private final float[] colorGradeTint = new float[] { 1.0f, 1.0f, 1.0f };
-    private final float[] motionBlurDirection = new float[] { 1.0f, 0.0f };
+    private final float[] colorGradeTint = new float[]{1.0f, 1.0f, 1.0f};
+    private final float[] motionBlurDirection = new float[]{1.0f, 0.0f};
 
     public boolean toneMappingEnabled() {
         return toneMappingEnabled;
     }
 
-    void setToneMappingEnabled(boolean toneMappingEnabled) {
+    public void setToneMappingEnabled(boolean toneMappingEnabled) {
         this.toneMappingEnabled = toneMappingEnabled;
     }
 
@@ -48,7 +48,7 @@ final class ScreenSpaceSettings {
         return bloomEnabled;
     }
 
-    void setBloomEnabled(boolean bloomEnabled) {
+    public void setBloomEnabled(boolean bloomEnabled) {
         this.bloomEnabled = bloomEnabled;
     }
 
@@ -56,7 +56,7 @@ final class ScreenSpaceSettings {
         return colorGradingEnabled;
     }
 
-    void setColorGradingEnabled(boolean colorGradingEnabled) {
+    public void setColorGradingEnabled(boolean colorGradingEnabled) {
         this.colorGradingEnabled = colorGradingEnabled;
     }
 
@@ -64,7 +64,7 @@ final class ScreenSpaceSettings {
         return depthOfFieldEnabled;
     }
 
-    void setDepthOfFieldEnabled(boolean depthOfFieldEnabled) {
+    public void setDepthOfFieldEnabled(boolean depthOfFieldEnabled) {
         this.depthOfFieldEnabled = depthOfFieldEnabled;
     }
 
@@ -72,7 +72,7 @@ final class ScreenSpaceSettings {
         return motionBlurEnabled;
     }
 
-    void setMotionBlurEnabled(boolean motionBlurEnabled) {
+    public void setMotionBlurEnabled(boolean motionBlurEnabled) {
         this.motionBlurEnabled = motionBlurEnabled;
     }
 
@@ -80,7 +80,7 @@ final class ScreenSpaceSettings {
         return vignetteEnabled;
     }
 
-    void setVignetteEnabled(boolean vignetteEnabled) {
+    public void setVignetteEnabled(boolean vignetteEnabled) {
         this.vignetteEnabled = vignetteEnabled;
     }
 
@@ -88,7 +88,7 @@ final class ScreenSpaceSettings {
         return filmGrainEnabled;
     }
 
-    void setFilmGrainEnabled(boolean filmGrainEnabled) {
+    public void setFilmGrainEnabled(boolean filmGrainEnabled) {
         this.filmGrainEnabled = filmGrainEnabled;
     }
 
@@ -96,7 +96,7 @@ final class ScreenSpaceSettings {
         return ssaoEnabled;
     }
 
-    void setSsaoEnabled(boolean ssaoEnabled) {
+    public void setSsaoEnabled(boolean ssaoEnabled) {
         this.ssaoEnabled = ssaoEnabled;
     }
 
@@ -104,7 +104,7 @@ final class ScreenSpaceSettings {
         return ssrEnabled;
     }
 
-    void setSsrEnabled(boolean ssrEnabled) {
+    public void setSsrEnabled(boolean ssrEnabled) {
         this.ssrEnabled = ssrEnabled;
     }
 
@@ -112,7 +112,7 @@ final class ScreenSpaceSettings {
         return ssgiEnabled;
     }
 
-    void setSsgiEnabled(boolean ssgiEnabled) {
+    public void setSsgiEnabled(boolean ssgiEnabled) {
         this.ssgiEnabled = ssgiEnabled;
     }
 
@@ -120,7 +120,7 @@ final class ScreenSpaceSettings {
         return contactShadowsEnabled;
     }
 
-    void setContactShadowsEnabled(boolean contactShadowsEnabled) {
+    public void setContactShadowsEnabled(boolean contactShadowsEnabled) {
         this.contactShadowsEnabled = contactShadowsEnabled;
     }
 
@@ -128,7 +128,7 @@ final class ScreenSpaceSettings {
         return rayTracingEnabled;
     }
 
-    void setRayTracingEnabled(boolean rayTracingEnabled) {
+    public void setRayTracingEnabled(boolean rayTracingEnabled) {
         this.rayTracingEnabled = rayTracingEnabled;
     }
 
@@ -136,7 +136,7 @@ final class ScreenSpaceSettings {
         return rayTracingShadowsEnabled;
     }
 
-    void setRayTracingShadowsEnabled(boolean rayTracingShadowsEnabled) {
+    public void setRayTracingShadowsEnabled(boolean rayTracingShadowsEnabled) {
         this.rayTracingShadowsEnabled = rayTracingShadowsEnabled;
     }
 
@@ -144,7 +144,7 @@ final class ScreenSpaceSettings {
         return rayTracingReflectionsEnabled;
     }
 
-    void setRayTracingReflectionsEnabled(boolean rayTracingReflectionsEnabled) {
+    public void setRayTracingReflectionsEnabled(boolean rayTracingReflectionsEnabled) {
         this.rayTracingReflectionsEnabled = rayTracingReflectionsEnabled;
     }
 
@@ -152,7 +152,7 @@ final class ScreenSpaceSettings {
         return exposure;
     }
 
-    void setExposure(float exposure) {
+    public void setExposure(float exposure) {
         this.exposure = exposure;
     }
 
@@ -160,7 +160,7 @@ final class ScreenSpaceSettings {
         return bloomStrength;
     }
 
-    void setBloomStrength(float bloomStrength) {
+    public void setBloomStrength(float bloomStrength) {
         this.bloomStrength = bloomStrength;
     }
 
@@ -168,7 +168,7 @@ final class ScreenSpaceSettings {
         return bloomThreshold;
     }
 
-    void setBloomThreshold(float bloomThreshold) {
+    public void setBloomThreshold(float bloomThreshold) {
         this.bloomThreshold = bloomThreshold;
     }
 
@@ -176,7 +176,7 @@ final class ScreenSpaceSettings {
         return colorGradeSaturation;
     }
 
-    void setColorGradeSaturation(float colorGradeSaturation) {
+    public void setColorGradeSaturation(float colorGradeSaturation) {
         this.colorGradeSaturation = colorGradeSaturation;
     }
 
@@ -184,7 +184,7 @@ final class ScreenSpaceSettings {
         return vignetteIntensity;
     }
 
-    void setVignetteIntensity(float vignetteIntensity) {
+    public void setVignetteIntensity(float vignetteIntensity) {
         this.vignetteIntensity = vignetteIntensity;
     }
 
@@ -192,7 +192,7 @@ final class ScreenSpaceSettings {
         return filmGrainIntensity;
     }
 
-    void setFilmGrainIntensity(float filmGrainIntensity) {
+    public void setFilmGrainIntensity(float filmGrainIntensity) {
         this.filmGrainIntensity = filmGrainIntensity;
     }
 
@@ -200,7 +200,7 @@ final class ScreenSpaceSettings {
         return dofFocus;
     }
 
-    void setDofFocus(float dofFocus) {
+    public void setDofFocus(float dofFocus) {
         this.dofFocus = dofFocus;
     }
 
@@ -208,7 +208,7 @@ final class ScreenSpaceSettings {
         return dofScale;
     }
 
-    void setDofScale(float dofScale) {
+    public void setDofScale(float dofScale) {
         this.dofScale = dofScale;
     }
 
@@ -216,7 +216,7 @@ final class ScreenSpaceSettings {
         return motionBlurStrength;
     }
 
-    void setMotionBlurStrength(float motionBlurStrength) {
+    public void setMotionBlurStrength(float motionBlurStrength) {
         this.motionBlurStrength = motionBlurStrength;
     }
 
@@ -224,7 +224,7 @@ final class ScreenSpaceSettings {
         return ssaoStrength;
     }
 
-    void setSsaoStrength(float ssaoStrength) {
+    public void setSsaoStrength(float ssaoStrength) {
         this.ssaoStrength = ssaoStrength;
     }
 
@@ -232,7 +232,7 @@ final class ScreenSpaceSettings {
         return ssaoRadius;
     }
 
-    void setSsaoRadius(float ssaoRadius) {
+    public void setSsaoRadius(float ssaoRadius) {
         this.ssaoRadius = ssaoRadius;
     }
 
@@ -240,7 +240,7 @@ final class ScreenSpaceSettings {
         return ssrStrength;
     }
 
-    void setSsrStrength(float ssrStrength) {
+    public void setSsrStrength(float ssrStrength) {
         this.ssrStrength = ssrStrength;
     }
 
@@ -248,7 +248,7 @@ final class ScreenSpaceSettings {
         return ssgiStrength;
     }
 
-    void setSsgiStrength(float ssgiStrength) {
+    public void setSsgiStrength(float ssgiStrength) {
         this.ssgiStrength = ssgiStrength;
     }
 
@@ -256,7 +256,7 @@ final class ScreenSpaceSettings {
         return contactShadowStrength;
     }
 
-    void setContactShadowStrength(float contactShadowStrength) {
+    public void setContactShadowStrength(float contactShadowStrength) {
         this.contactShadowStrength = contactShadowStrength;
     }
 
@@ -264,7 +264,7 @@ final class ScreenSpaceSettings {
         return rayTracingMix;
     }
 
-    void setRayTracingMix(float rayTracingMix) {
+    public void setRayTracingMix(float rayTracingMix) {
         this.rayTracingMix = rayTracingMix;
     }
 
@@ -272,7 +272,7 @@ final class ScreenSpaceSettings {
         return rayTracingMaxBounces;
     }
 
-    void setRayTracingMaxBounces(int rayTracingMaxBounces) {
+    public void setRayTracingMaxBounces(int rayTracingMaxBounces) {
         this.rayTracingMaxBounces = rayTracingMaxBounces;
     }
 
