@@ -146,21 +146,25 @@ public final class GltfModelImporter implements ModelImporter {
             JsonObject attributes = primitive.getAsJsonObject("attributes");
             int positionAccessorIndex = attributes.get("POSITION").getAsInt();
             int normalAccessorIndex = attributes.has("NORMAL") ? attributes.get("NORMAL").getAsInt() : -1;
-            int texCoordAccessorIndex = attributes.has("TEXCOORD_0") ? attributes.get("TEXCOORD_0").getAsInt() : -1;
+            int texCoord0AccessorIndex = attributes.has("TEXCOORD_0") ? attributes.get("TEXCOORD_0").getAsInt() : -1;
+            int texCoord1AccessorIndex = attributes.has("TEXCOORD_1") ? attributes.get("TEXCOORD_1").getAsInt() : -1;
             int indexAccessorIndex = primitive.has("indices") ? primitive.get("indices").getAsInt() : -1;
             int materialIndex = primitive.has("material") ? primitive.get("material").getAsInt() : -1;
             float[] positions = readFloatVec3(accessors, bufferViews, bufferBytes, positionAccessorIndex);
             float[] normals = normalAccessorIndex >= 0
                 ? readFloatVec3(accessors, bufferViews, bufferBytes, normalAccessorIndex)
                 : defaultNormals(positions.length / 3);
-            float[] texCoords = texCoordAccessorIndex >= 0
-                ? readFloatVec2(accessors, bufferViews, bufferBytes, texCoordAccessorIndex)
+            float[] texCoords0 = texCoord0AccessorIndex >= 0
+                ? readFloatVec2(accessors, bufferViews, bufferBytes, texCoord0AccessorIndex)
+                : null;
+            float[] texCoords1 = texCoord1AccessorIndex >= 0
+                ? readFloatVec2(accessors, bufferViews, bufferBytes, texCoord1AccessorIndex)
                 : null;
             applyTransform(positions, normals, transform);
             int[] indices = indexAccessorIndex >= 0
                 ? readIndices(accessors, bufferViews, bufferBytes, indexAccessorIndex)
                 : sequentialIndices(positions.length / 3);
-            MeshData meshData = new MeshData(positions, normals, texCoords, indices);
+            MeshData meshData = new MeshData(positions, normals, texCoords0, texCoords1, indices);
             primitives.add(new PrimitiveMesh(meshData, materialIndex));
         }
     }
@@ -356,25 +360,35 @@ public final class GltfModelImporter implements ModelImporter {
                 };
             }
             if (pbr.has("baseColorTexture")) {
-                int textureIndex = pbr.getAsJsonObject("baseColorTexture").get("index").getAsInt();
-                baseColorTexture = loadTextureByIndex(textureIndex, root, bufferBytes, baseDir);
+                JsonObject textureInfo = pbr.getAsJsonObject("baseColorTexture");
+                int textureIndex = textureInfo.get("index").getAsInt();
+                int texCoord = textureInfo.has("texCoord") ? textureInfo.get("texCoord").getAsInt() : 0;
+                baseColorTexture = loadTextureByIndex(textureIndex, texCoord, root, bufferBytes, baseDir);
             }
             if (pbr.has("metallicRoughnessTexture")) {
-                int textureIndex = pbr.getAsJsonObject("metallicRoughnessTexture").get("index").getAsInt();
-                metallicRoughnessTexture = loadTextureByIndex(textureIndex, root, bufferBytes, baseDir);
+                JsonObject textureInfo = pbr.getAsJsonObject("metallicRoughnessTexture");
+                int textureIndex = textureInfo.get("index").getAsInt();
+                int texCoord = textureInfo.has("texCoord") ? textureInfo.get("texCoord").getAsInt() : 0;
+                metallicRoughnessTexture = loadTextureByIndex(textureIndex, texCoord, root, bufferBytes, baseDir);
             }
         }
         if (material.has("normalTexture")) {
-            int textureIndex = material.getAsJsonObject("normalTexture").get("index").getAsInt();
-            normalTexture = loadTextureByIndex(textureIndex, root, bufferBytes, baseDir);
+            JsonObject textureInfo = material.getAsJsonObject("normalTexture");
+            int textureIndex = textureInfo.get("index").getAsInt();
+            int texCoord = textureInfo.has("texCoord") ? textureInfo.get("texCoord").getAsInt() : 0;
+            normalTexture = loadTextureByIndex(textureIndex, texCoord, root, bufferBytes, baseDir);
         }
         if (material.has("occlusionTexture")) {
-            int textureIndex = material.getAsJsonObject("occlusionTexture").get("index").getAsInt();
-            aoTexture = loadTextureByIndex(textureIndex, root, bufferBytes, baseDir);
+            JsonObject textureInfo = material.getAsJsonObject("occlusionTexture");
+            int textureIndex = textureInfo.get("index").getAsInt();
+            int texCoord = textureInfo.has("texCoord") ? textureInfo.get("texCoord").getAsInt() : 0;
+            aoTexture = loadTextureByIndex(textureIndex, texCoord, root, bufferBytes, baseDir);
         }
         if (material.has("emissiveTexture")) {
-            int textureIndex = material.getAsJsonObject("emissiveTexture").get("index").getAsInt();
-            emissiveTexture = loadTextureByIndex(textureIndex, root, bufferBytes, baseDir);
+            JsonObject textureInfo = material.getAsJsonObject("emissiveTexture");
+            int textureIndex = textureInfo.get("index").getAsInt();
+            int texCoord = textureInfo.has("texCoord") ? textureInfo.get("texCoord").getAsInt() : 0;
+            emissiveTexture = loadTextureByIndex(textureIndex, texCoord, root, bufferBytes, baseDir);
         }
         MaterialData materialData = new MaterialData(
             baseColor,
@@ -399,7 +413,13 @@ public final class GltfModelImporter implements ModelImporter {
         );
     }
 
-    private TextureSlot loadTextureByIndex(int textureIndex, JsonObject root, byte[][] bufferBytes, Path baseDir) {
+    private TextureSlot loadTextureByIndex(
+        int textureIndex,
+        int texCoord,
+        JsonObject root,
+        byte[] bufferBytes,
+        Path baseDir
+    ) {
         if (!root.has("textures") || !root.has("images")) {
             logger.warn("glTF texture referenced but textures/images arrays are missing");
             return null;
@@ -427,7 +447,7 @@ public final class GltfModelImporter implements ModelImporter {
                 return null;
             }
             logger.info("Loaded glTF texture image {}", sourceIndex);
-            return new TextureSlot(buildTextureData(bufferedImage), samplerData);
+            return new TextureSlot(buildTextureData(bufferedImage), samplerData, texCoord);
         } catch (Exception e) {
             logger.warn("Failed to load glTF texture image {}", sourceIndex, e);
             return null;

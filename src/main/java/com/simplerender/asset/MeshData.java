@@ -6,7 +6,8 @@ import java.util.Arrays;
 public final class MeshData {
     private final float[] positions;
     private final float[] normals;
-    private final float[] texCoords;
+    private final float[] texCoords0;
+    private final float[] texCoords1;
     private final float[] tangents;
     private final float[] bitangents;
     private final int[] indices;
@@ -14,18 +15,30 @@ public final class MeshData {
     private final float boundsRadius;
 
     public MeshData(float[] positions, float[] normals, int[] indices) {
-        this(positions, normals, null, indices);
+        this(positions, normals, null, null, indices);
     }
 
     public MeshData(float[] positions, float[] normals, float[] texCoords, int[] indices) {
+        this(positions, normals, texCoords, null, indices);
+    }
+
+    public MeshData(
+        float[] positions,
+        float[] normals,
+        float[] texCoords0,
+        float[] texCoords1,
+        int[] indices
+    ) {
         this.positions = Arrays.copyOf(positions, positions.length);
         this.normals = Arrays.copyOf(normals, normals.length);
-        this.texCoords = buildTexCoords(texCoords, this.positions.length / 3);
+        int vertexCount = this.positions.length / 3;
+        this.texCoords0 = buildTexCoords(texCoords0, vertexCount, null);
+        this.texCoords1 = buildTexCoords(texCoords1, vertexCount, this.texCoords0);
         this.indices = Arrays.copyOf(indices, indices.length);
         float[][] tb = buildTangents(
             this.positions,
             this.normals,
-            this.texCoords,
+            this.texCoords0,
             this.indices
         );
         this.tangents = tb[0];
@@ -44,7 +57,15 @@ public final class MeshData {
     }
 
     public float[] texCoords() {
-        return Arrays.copyOf(texCoords, texCoords.length);
+        return Arrays.copyOf(texCoords0, texCoords0.length);
+    }
+
+    public float[] texCoords0() {
+        return Arrays.copyOf(texCoords0, texCoords0.length);
+    }
+
+    public float[] texCoords1() {
+        return Arrays.copyOf(texCoords1, texCoords1.length);
     }
 
     public float[] tangents() {
@@ -128,9 +149,12 @@ public final class MeshData {
         return (float) Math.sqrt(maxDistanceSq);
     }
 
-    private static float[] buildTexCoords(float[] texCoords, int vertexCount) {
+    private static float[] buildTexCoords(float[] texCoords, int vertexCount, float[] fallbackSource) {
         int expectedLength = vertexCount * 2;
         if (texCoords == null || texCoords.length != expectedLength) {
+            if (fallbackSource != null && fallbackSource.length == expectedLength) {
+                return Arrays.copyOf(fallbackSource, expectedLength);
+            }
             float[] fallback = new float[expectedLength];
             for (int i = 0; i < vertexCount; i++) {
                 int base = i * 2;
