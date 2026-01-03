@@ -1,6 +1,7 @@
 package com.simplerender.gl.upload;
 
 import com.simplerender.asset.TextureData;
+import com.simplerender.asset.TextureColorSpace;
 import com.simplerender.gl.GpuTexture;
 import java.nio.ByteBuffer;
 import org.lwjgl.BufferUtils;
@@ -8,6 +9,7 @@ import org.lwjgl.opengl.ARBSparseTexture;
 import org.lwjgl.opengl.GL;
 import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL12;
+import org.lwjgl.opengl.GL21;
 import org.lwjgl.opengl.GL30;
 import org.lwjgl.opengl.GL42;
 
@@ -28,8 +30,11 @@ public final class SparseTextureUploader {
         byte[] rgba = textureData.rgba();
         ByteBuffer buffer = BufferUtils.createByteBuffer(rgba.length);
         buffer.put(rgba).flip();
+        int internalFormat = textureData.colorSpace() == TextureColorSpace.SRGB
+            ? GL21.GL_SRGB8_ALPHA8
+            : GL11.GL_RGBA8;
         if (GL.getCapabilities().OpenGL42) {
-            GL42.glTexStorage2D(GL11.GL_TEXTURE_2D, 1, GL11.GL_RGBA8, textureData.width(), textureData.height());
+            GL42.glTexStorage2D(GL11.GL_TEXTURE_2D, 1, internalFormat, textureData.width(), textureData.height());
             GL11.glTexSubImage2D(
                 GL11.GL_TEXTURE_2D,
                 0,
@@ -45,7 +50,7 @@ public final class SparseTextureUploader {
             GL11.glTexImage2D(
                 GL11.GL_TEXTURE_2D,
                 0,
-                GL11.GL_RGBA8,
+                internalFormat,
                 textureData.width(),
                 textureData.height(),
                 0,

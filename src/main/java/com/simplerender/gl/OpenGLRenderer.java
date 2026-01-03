@@ -7,6 +7,7 @@ import com.simplerender.asset.ShaderSource;
 import com.simplerender.asset.ShaderSourceLoader;
 import com.simplerender.asset.TextureData;
 import com.simplerender.asset.TextureDataFactory;
+import com.simplerender.asset.TextureColorSpace;
 import com.simplerender.render.MaterialHandle;
 import com.simplerender.render.MeshHandle;
 import com.simplerender.render.MeshUploader;
@@ -216,11 +217,11 @@ public final class OpenGLRenderer implements MeshUploader {
         GL11.glClearColor(0.12f, 0.12f, 0.12f, 1.0f);
         uniforms = new RenderUniforms(1.0f);
         resourceManager.initDefaultTextures(
-            TextureDataFactory.solidColor(255, 255, 255, 255),
+            TextureDataFactory.solidColor(255, 255, 255, 255, TextureColorSpace.SRGB),
             TextureDataFactory.solidColor(128, 128, 255, 255),
             TextureDataFactory.solidColor(0, 255, 0, 255),
             TextureDataFactory.solidColor(255, 255, 255, 255),
-            TextureDataFactory.solidColor(0, 0, 0, 255)
+            TextureDataFactory.solidColor(0, 0, 0, 255, TextureColorSpace.SRGB)
         );
         resourceManager.initDefaultSampler(SamplerData.defaults());
         ShaderSource shaderSource = ShaderSourceLoader.loadByName(pendingShaderName);
