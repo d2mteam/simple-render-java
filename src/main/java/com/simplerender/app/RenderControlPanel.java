@@ -190,19 +190,19 @@ public final class RenderControlPanel {
         );
 
         CheckBox rayTracing = new CheckBox("Ray Tracing");
-        rayTracing.setSelected(true);
+        rayTracing.setSelected(false);
         rayTracing.selectedProperty().addListener((obs, oldValue, newValue) ->
             renderer.updateScreenSpaceSettings(settings -> settings.setRayTracingEnabled(newValue))
         );
 
         CheckBox rayTracingShadows = new CheckBox("Ray Tracing Shadows");
-        rayTracingShadows.setSelected(true);
+        rayTracingShadows.setSelected(false);
         rayTracingShadows.selectedProperty().addListener((obs, oldValue, newValue) ->
             renderer.updateScreenSpaceSettings(settings -> settings.setRayTracingShadowsEnabled(newValue))
         );
 
         CheckBox rayTracingReflections = new CheckBox("Ray Tracing Reflections");
-        rayTracingReflections.setSelected(true);
+        rayTracingReflections.setSelected(false);
         rayTracingReflections.selectedProperty().addListener((obs, oldValue, newValue) ->
             renderer.updateScreenSpaceSettings(settings -> settings.setRayTracingReflectionsEnabled(newValue))
         );
