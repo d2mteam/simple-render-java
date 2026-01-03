@@ -51,25 +51,28 @@ public final class GPUMesh {
         indexBuffer.bind();
         float[] positions = snapshot.positions();
         float[] normals = snapshot.normals();
-        float[] texCoords = snapshot.texCoords();
+        float[] texCoords0 = snapshot.texCoords0();
+        float[] texCoords1 = snapshot.texCoords1();
         float[] tangents = snapshot.tangents();
         float[] bitangents = snapshot.bitangents();
-        int required = positions.length / 3 * 14;
+        int required = positions.length / 3 * 16;
         ensureInterleavedCapacity(required);
-        interleave(positions, normals, texCoords, tangents, bitangents, interleaved);
+        interleave(positions, normals, texCoords0, texCoords1, tangents, bitangents, interleaved);
         vertexBuffer.upload(interleaved, required, uploadMode.bufferUsage());
         int[] indexData = snapshot.indices();
         indexBuffer.upload(indexData, indexData.length, uploadMode.bufferUsage());
         GL20.glEnableVertexAttribArray(0);
-        GL20.glVertexAttribPointer(0, 3, GL11.GL_FLOAT, false, 14 * Float.BYTES, 0);
+        GL20.glVertexAttribPointer(0, 3, GL11.GL_FLOAT, false, 16 * Float.BYTES, 0);
         GL20.glEnableVertexAttribArray(1);
-        GL20.glVertexAttribPointer(1, 3, GL11.GL_FLOAT, false, 14 * Float.BYTES, 3L * Float.BYTES);
+        GL20.glVertexAttribPointer(1, 3, GL11.GL_FLOAT, false, 16 * Float.BYTES, 3L * Float.BYTES);
         GL20.glEnableVertexAttribArray(2);
-        GL20.glVertexAttribPointer(2, 2, GL11.GL_FLOAT, false, 14 * Float.BYTES, 6L * Float.BYTES);
+        GL20.glVertexAttribPointer(2, 2, GL11.GL_FLOAT, false, 16 * Float.BYTES, 6L * Float.BYTES);
         GL20.glEnableVertexAttribArray(3);
-        GL20.glVertexAttribPointer(3, 3, GL11.GL_FLOAT, false, 14 * Float.BYTES, 8L * Float.BYTES);
+        GL20.glVertexAttribPointer(3, 2, GL11.GL_FLOAT, false, 16 * Float.BYTES, 8L * Float.BYTES);
         GL20.glEnableVertexAttribArray(4);
-        GL20.glVertexAttribPointer(4, 3, GL11.GL_FLOAT, false, 14 * Float.BYTES, 11L * Float.BYTES);
+        GL20.glVertexAttribPointer(4, 3, GL11.GL_FLOAT, false, 16 * Float.BYTES, 10L * Float.BYTES);
+        GL20.glEnableVertexAttribArray(5);
+        GL20.glVertexAttribPointer(5, 3, GL11.GL_FLOAT, false, 16 * Float.BYTES, 13L * Float.BYTES);
         indexCount = indexData.length;
         logger.debug("Uploaded mesh with {} vertices and {} indices", vertexCount, indexCount);
     }
@@ -96,7 +99,8 @@ public final class GPUMesh {
     private void interleave(
         float[] positions,
         float[] normals,
-        float[] texCoords,
+        float[] texCoords0,
+        float[] texCoords1,
         float[] tangents,
         float[] bitangents,
         float[] data
@@ -104,7 +108,8 @@ public final class GPUMesh {
         int vertexCount = positions.length / 3;
         int p = 0;
         int n = 0;
-        int t = 0;
+        int t0 = 0;
+        int t1 = 0;
         int tan = 0;
         int bitan = 0;
         int d = 0;
@@ -115,8 +120,10 @@ public final class GPUMesh {
             data[d++] = normals[n++];
             data[d++] = normals[n++];
             data[d++] = normals[n++];
-            data[d++] = texCoords[t++];
-            data[d++] = texCoords[t++];
+            data[d++] = texCoords0[t0++];
+            data[d++] = texCoords0[t0++];
+            data[d++] = texCoords1[t1++];
+            data[d++] = texCoords1[t1++];
             data[d++] = tangents[tan++];
             data[d++] = tangents[tan++];
             data[d++] = tangents[tan++];

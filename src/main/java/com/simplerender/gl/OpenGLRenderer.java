@@ -371,6 +371,11 @@ public final class OpenGLRenderer implements MeshUploader {
             }
             shaderProgram.setUniformMat4("uModel", item.transform().matrix());
             shaderProgram.setUniformVec3("uBaseColor", material.baseColor());
+            shaderProgram.setUniformIntIfPresent("uBaseColorTexCoord", material.baseColorTexCoord());
+            shaderProgram.setUniformIntIfPresent("uNormalTexCoord", material.normalTexCoord());
+            shaderProgram.setUniformIntIfPresent("uMetallicRoughnessTexCoord", material.metallicRoughnessTexCoord());
+            shaderProgram.setUniformIntIfPresent("uAoTexCoord", material.aoTexCoord());
+            shaderProgram.setUniformIntIfPresent("uEmissiveTexCoord", material.emissiveTexCoord());
             bindTextureUnit(
                 GL13.GL_TEXTURE0,
                 resourceManager.texture(material.baseColorTexture()),

@@ -2,7 +2,8 @@
 in vec3 vNormal;
 in vec3 vTangent;
 in vec3 vBitangent;
-in vec2 vTexCoord;
+in vec2 vTexCoord0;
+in vec2 vTexCoord1;
 in vec3 vWorldPos;
 const int MAX_LIGHTS = 8;
 uniform int uLightCount;
@@ -18,7 +19,16 @@ uniform sampler2D uNormalTex;
 uniform sampler2D uMetallicRoughnessTex;
 uniform sampler2D uAoTex;
 uniform sampler2D uEmissiveTex;
+uniform int uBaseColorTexCoord;
+uniform int uNormalTexCoord;
+uniform int uMetallicRoughnessTexCoord;
+uniform int uAoTexCoord;
+uniform int uEmissiveTexCoord;
 out vec4 FragColor;
+
+vec2 selectTexCoord(int index) {
+    return index == 1 ? vTexCoord1 : vTexCoord0;
+}
 
 float schlickWeight(float cosTheta) {
     float m = clamp(1.0 - cosTheta, 0.0, 1.0);
@@ -64,18 +74,23 @@ vec3 applyLighting(vec3 n, vec3 v, vec3 base, float metallic, float roughness, f
 }
 
 void main() {
+    vec2 normalUv = selectTexCoord(uNormalTexCoord);
+    vec2 baseUv = selectTexCoord(uBaseColorTexCoord);
+    vec2 metallicUv = selectTexCoord(uMetallicRoughnessTexCoord);
+    vec2 aoUv = selectTexCoord(uAoTexCoord);
+    vec2 emissiveUv = selectTexCoord(uEmissiveTexCoord);
     vec3 n = normalize(vNormal);
     vec3 t = normalize(vTangent);
     vec3 b = normalize(vBitangent);
     mat3 tbn = mat3(t, b, n);
-    vec3 normalSample = texture(uNormalTex, vTexCoord).rgb * 2.0 - 1.0;
+    vec3 normalSample = texture(uNormalTex, normalUv).rgb * 2.0 - 1.0;
     n = normalize(tbn * normalSample);
-    vec3 metallicRoughness = texture(uMetallicRoughnessTex, vTexCoord).rgb;
+    vec3 metallicRoughness = texture(uMetallicRoughnessTex, metallicUv).rgb;
     float metallic = metallicRoughness.b;
     float roughness = metallicRoughness.g;
-    float ao = texture(uAoTex, vTexCoord).r;
-    vec3 emissive = texture(uEmissiveTex, vTexCoord).rgb;
-    vec3 base = uBaseColor * texture(uBaseColorTex, vTexCoord).rgb;
+    float ao = texture(uAoTex, aoUv).r;
+    vec3 emissive = texture(uEmissiveTex, emissiveUv).rgb;
+    vec3 base = uBaseColor * texture(uBaseColorTex, baseUv).rgb;
     vec3 v = vec3(0.0, 0.0, 1.0);
     vec3 color = applyLighting(n, v, base, metallic, roughness, ao, emissive);
     FragColor = vec4(color, 1.0);

@@ -77,30 +77,40 @@ final class GpuResourceManager {
     ) {
         TextureHandle baseColorHandle = resolveTexture(materialData.baseColorTexture(), defaultBaseColorTexture, textureUpload);
         SamplerHandle baseColorSampler = resolveSampler(materialData.baseColorTexture(), defaultSampler, samplerUpload);
+        int baseColorTexCoord = resolveTexCoord(materialData.baseColorTexture());
         TextureHandle normalHandle = resolveTexture(materialData.normalTexture(), defaultNormalTexture, textureUpload);
         SamplerHandle normalSampler = resolveSampler(materialData.normalTexture(), defaultSampler, samplerUpload);
+        int normalTexCoord = resolveTexCoord(materialData.normalTexture());
         TextureHandle metallicRoughnessHandle = resolveTexture(
             materialData.metallicRoughnessTexture(),
             defaultMetallicRoughnessTexture,
             textureUpload
         );
         SamplerHandle metallicRoughnessSampler = resolveSampler(materialData.metallicRoughnessTexture(), defaultSampler, samplerUpload);
+        int metallicRoughnessTexCoord = resolveTexCoord(materialData.metallicRoughnessTexture());
         TextureHandle aoHandle = resolveTexture(materialData.aoTexture(), defaultAoTexture, textureUpload);
         SamplerHandle aoSampler = resolveSampler(materialData.aoTexture(), defaultSampler, samplerUpload);
+        int aoTexCoord = resolveTexCoord(materialData.aoTexture());
         TextureHandle emissiveHandle = resolveTexture(materialData.emissiveTexture(), defaultEmissiveTexture, textureUpload);
         SamplerHandle emissiveSampler = resolveSampler(materialData.emissiveTexture(), defaultSampler, samplerUpload);
+        int emissiveTexCoord = resolveTexCoord(materialData.emissiveTexture());
         materials.put(handle, new GpuMaterial(
             materialData.baseColor(),
             baseColorHandle,
             baseColorSampler,
+            baseColorTexCoord,
             normalHandle,
             normalSampler,
+            normalTexCoord,
             metallicRoughnessHandle,
             metallicRoughnessSampler,
+            metallicRoughnessTexCoord,
             aoHandle,
             aoSampler,
+            aoTexCoord,
             emissiveHandle,
-            emissiveSampler
+            emissiveSampler,
+            emissiveTexCoord
         ));
         logger.info("Uploaded material handle {}", handle.hashCode());
     }
@@ -197,6 +207,10 @@ final class GpuResourceManager {
         return slot.flatMap(TextureSlot::samplerData).map(samplerUpload::upload).orElse(fallback);
     }
 
+    private int resolveTexCoord(java.util.Optional<TextureSlot> slot) {
+        return slot.map(TextureSlot::texCoord).orElse(0);
+    }
+
     @FunctionalInterface
     interface TextureUploadDelegate {
         TextureHandle upload(TextureData textureData);
@@ -211,14 +225,19 @@ final class GpuResourceManager {
         float[] baseColor,
         TextureHandle baseColorTexture,
         SamplerHandle baseColorSampler,
+        int baseColorTexCoord,
         TextureHandle normalTexture,
         SamplerHandle normalSampler,
+        int normalTexCoord,
         TextureHandle metallicRoughnessTexture,
         SamplerHandle metallicRoughnessSampler,
+        int metallicRoughnessTexCoord,
         TextureHandle aoTexture,
         SamplerHandle aoSampler,
+        int aoTexCoord,
         TextureHandle emissiveTexture,
-        SamplerHandle emissiveSampler
+        SamplerHandle emissiveSampler,
+        int emissiveTexCoord
     ) {
     }
 }
