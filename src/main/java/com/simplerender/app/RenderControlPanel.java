@@ -93,7 +93,9 @@ public final class RenderControlPanel {
                     }
                     Platform.runLater(() -> {
                         refreshObjectList(scene, objectList);
-                        objectList.getSelectionModel().select(index);
+                        if (index >= 0) {
+                            objectList.getSelectionModel().select(index);
+                        }
                     });
                 });
         });

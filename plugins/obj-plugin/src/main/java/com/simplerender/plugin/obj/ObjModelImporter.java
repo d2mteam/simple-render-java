@@ -30,7 +30,7 @@ public final class ObjModelImporter implements ModelImporter {
         int[] indices = objData.indices();
         MeshData meshData = new MeshData(positions, normals, texCoords, indices);
         MaterialData materialData = buildMaterial(path, objData.materialLibrary(), objData.materialName());
-        return new ImportedModel(meshData, materialData);
+        return new ImportedModel(List.of(new ImportedPrimitive(meshData, materialData)));
     }
 
     private ObjData parseObj(Path path) {
