@@ -28,11 +28,25 @@ public final class GameApplication {
         this.renderer.init();
         ModelImportService importService = ModelImportService.defaultService();
         importService.loadPlugins();
-        Optional<Path> modelPath = ModelFileDialog.chooseModelFile();
-        modelPath.ifPresent(path -> logger.info("Selected model path: {}", path));
-        Optional<ModelImporter.ImportedModel> importedModel = modelPath.flatMap(importService::importModel);
-        if (modelPath.isPresent() && importedModel.isEmpty()) {
-            throw new IllegalStateException("Selected model could not be imported.");
+        String configModelPath = config.modelPath();
+        Optional<Path> modelPath;
+        Optional<ModelImporter.ImportedModel> importedModel;
+        if (configModelPath != null && !configModelPath.isBlank()) {
+            Path path = Path.of(configModelPath);
+            modelPath = Optional.of(path);
+            logger.info("Model import source: config path ({})", path);
+            importedModel = importService.importModel(path);
+            if (importedModel.isEmpty()) {
+                throw new IllegalStateException("Configured model could not be imported: " + path);
+            }
+        } else {
+            logger.info("Model import source: file dialog");
+            modelPath = ModelFileDialog.chooseModelFile();
+            modelPath.ifPresent(path -> logger.info("Selected model path: {}", path));
+            importedModel = modelPath.flatMap(importService::importModel);
+            if (modelPath.isPresent() && importedModel.isEmpty()) {
+                throw new IllegalStateException("Selected model could not be imported.");
+            }
         }
         if (importedModel.isPresent()) {
             logger.info("Imported model ready for rendering");
