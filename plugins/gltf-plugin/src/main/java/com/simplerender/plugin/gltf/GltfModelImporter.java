@@ -137,12 +137,12 @@ public final class GltfModelImporter implements ModelImporter {
             return;
         }
         JsonObject mesh = meshes.get(meshIndex).getAsJsonObject();
-        JsonArray primitives = mesh.getAsJsonArray("primitives");
-        if (primitives == null) {
+        JsonArray meshPrimitives = mesh.getAsJsonArray("primitives");
+        if (meshPrimitives == null) {
             return;
         }
-        for (int i = 0; i < primitives.size(); i++) {
-            JsonObject primitive = primitives.get(i).getAsJsonObject();
+        for (int i = 0; i < meshPrimitives.size(); i++) {
+            JsonObject primitive = meshPrimitives.get(i).getAsJsonObject();
             JsonObject attributes = primitive.getAsJsonObject("attributes");
             int positionAccessorIndex = attributes.get("POSITION").getAsInt();
             int normalAccessorIndex = attributes.has("NORMAL") ? attributes.get("NORMAL").getAsInt() : -1;
@@ -417,7 +417,7 @@ public final class GltfModelImporter implements ModelImporter {
         int textureIndex,
         int texCoord,
         JsonObject root,
-        byte[] bufferBytes,
+        byte[][] bufferBytes,
         Path baseDir
     ) {
         if (!root.has("textures") || !root.has("images")) {
