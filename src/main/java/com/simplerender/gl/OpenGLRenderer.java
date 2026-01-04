@@ -358,7 +358,6 @@ public final class OpenGLRenderer implements MeshUploader {
         shaderProgram.setUniformMat4("uProjection", uniforms.projectionMatrix());
         shaderProgram.setUniformMat4("uView", uniforms.viewMatrix());
         shaderProgram.setUniformVec3("uCameraPos", snapshot.camera().position());
-        shaderProgram.setUniformMat4("uModel", Matrix4f.identity());
         applyLightUniforms();
         pipeline.updateFrustum(uniforms.projectionMatrix(), uniforms.viewMatrix());
         RenderItem[] renderItems = snapshot.renderItems();

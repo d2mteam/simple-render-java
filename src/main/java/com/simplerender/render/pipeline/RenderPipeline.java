@@ -25,13 +25,36 @@ public final class RenderPipeline {
         if (center == null || radius <= 0.0f) {
             return true;
         }
-        Vector3f position = item.transform().position();
-        float scale = Math.abs(item.transform().scale());
-        Vector3f worldCenter = new Vector3f(
-            center.x() * scale + position.x(),
-            center.y() * scale + position.y(),
-            center.z() * scale + position.z()
+        float[] modelMatrix = item.transform().matrix();
+        float worldX = modelMatrix[0] * center.x()
+            + modelMatrix[4] * center.y()
+            + modelMatrix[8] * center.z()
+            + modelMatrix[12];
+        float worldY = modelMatrix[1] * center.x()
+            + modelMatrix[5] * center.y()
+            + modelMatrix[9] * center.z()
+            + modelMatrix[13];
+        float worldZ = modelMatrix[2] * center.x()
+            + modelMatrix[6] * center.y()
+            + modelMatrix[10] * center.z()
+            + modelMatrix[14];
+        Vector3f worldCenter = new Vector3f(worldX, worldY, worldZ);
+        float scaleX = (float) Math.sqrt(
+            modelMatrix[0] * modelMatrix[0]
+                + modelMatrix[1] * modelMatrix[1]
+                + modelMatrix[2] * modelMatrix[2]
         );
-        return frustumCuller.isVisible(worldCenter, radius * scale);
+        float scaleY = (float) Math.sqrt(
+            modelMatrix[4] * modelMatrix[4]
+                + modelMatrix[5] * modelMatrix[5]
+                + modelMatrix[6] * modelMatrix[6]
+        );
+        float scaleZ = (float) Math.sqrt(
+            modelMatrix[8] * modelMatrix[8]
+                + modelMatrix[9] * modelMatrix[9]
+                + modelMatrix[10] * modelMatrix[10]
+        );
+        float maxScale = Math.max(scaleX, Math.max(scaleY, scaleZ));
+        return frustumCuller.isVisible(worldCenter, radius * maxScale);
     }
 }
