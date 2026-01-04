@@ -1,6 +1,7 @@
 package com.simplerender.plugin.gltf;
 
 import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.simplerender.asset.MaterialData;
@@ -154,22 +155,103 @@ public final class GltfModelImporter implements ModelImporter {
             int texCoord1AccessorIndex = attributes.has("TEXCOORD_1") ? attributes.get("TEXCOORD_1").getAsInt() : -1;
             int indexAccessorIndex = primitive.has("indices") ? primitive.get("indices").getAsInt() : -1;
             int materialIndex = primitive.has("material") ? primitive.get("material").getAsInt() : -1;
-            float[] positions = readFloatVec3(accessors, bufferViews, bufferBytes, positionAccessorIndex);
-            float[] normals = normalAccessorIndex >= 0
-                    ? readFloatVec3(accessors, bufferViews, bufferBytes, normalAccessorIndex)
-                    : defaultNormals(positions.length / 3);
-            float[] texCoords0 = texCoord0AccessorIndex >= 0
-                    ? readFloatVec2(accessors, bufferViews, bufferBytes, texCoord0AccessorIndex)
-                    : null;
-            float[] texCoords1 = texCoord1AccessorIndex >= 0
-                    ? readFloatVec2(accessors, bufferViews, bufferBytes, texCoord1AccessorIndex)
-                    : null;
-            int[] indices = indexAccessorIndex >= 0
-                    ? readIndices(accessors, bufferViews, bufferBytes, indexAccessorIndex)
-                    : sequentialIndices(positions.length / 3);
+            DracoMesh dracoMesh = decodeDracoPrimitive(primitive, accessors, bufferViews, bufferBytes);
+            float[] positions = dracoMesh != null
+                    ? dracoMesh.positions()
+                    : readFloatVec3(accessors, bufferViews, bufferBytes, positionAccessorIndex);
+            float[] normals = dracoMesh != null
+                    ? dracoMesh.normals()
+                    : (normalAccessorIndex >= 0
+                            ? readFloatVec3(accessors, bufferViews, bufferBytes, normalAccessorIndex)
+                            : defaultNormals(positions.length / 3));
+            float[] texCoords0 = dracoMesh != null
+                    ? dracoMesh.texCoords0()
+                    : (texCoord0AccessorIndex >= 0
+                            ? readFloatVec2(accessors, bufferViews, bufferBytes, texCoord0AccessorIndex)
+                            : null);
+            float[] texCoords1 = dracoMesh != null
+                    ? dracoMesh.texCoords1()
+                    : (texCoord1AccessorIndex >= 0
+                            ? readFloatVec2(accessors, bufferViews, bufferBytes, texCoord1AccessorIndex)
+                            : null);
+            int[] indices = dracoMesh != null
+                    ? dracoMesh.indices()
+                    : (indexAccessorIndex >= 0
+                            ? readIndices(accessors, bufferViews, bufferBytes, indexAccessorIndex)
+                            : sequentialIndices(positions.length / 3));
             MeshData meshData = new MeshData(positions, normals, texCoords0, texCoords1, indices);
             primitives.add(new PrimitiveMesh(meshData, materialIndex, transform));
         }
+    }
+
+    private DracoMesh decodeDracoPrimitive(
+            JsonObject primitive,
+            JsonArray accessors,
+            JsonArray bufferViews,
+            byte[][] bufferBytes) {
+        if (!primitive.has("extensions")) {
+            return null;
+        }
+        JsonObject extensions = primitive.getAsJsonObject("extensions");
+        if (!extensions.has("KHR_draco_mesh_compression")) {
+            return null;
+        }
+        JsonObject draco = extensions.getAsJsonObject("KHR_draco_mesh_compression");
+        int bufferViewIndex = draco.get("bufferView").getAsInt();
+        JsonObject bufferView = bufferViews.get(bufferViewIndex).getAsJsonObject();
+        byte[] compressed = readBufferViewBytes(bufferView, bufferBytes);
+        JsonObject dracoAttributes = draco.getAsJsonObject("attributes");
+
+        Map<String, DracoAttributeSpec> attributeSpecs = new HashMap<>();
+        for (Map.Entry<String, JsonElement> entry : dracoAttributes.entrySet()) {
+            String name = entry.getKey();
+            if (!primitive.getAsJsonObject("attributes").has(name)) {
+                continue;
+            }
+            int accessorIndex = primitive.getAsJsonObject("attributes").get(name).getAsInt();
+            JsonObject accessor = accessors.get(accessorIndex).getAsJsonObject();
+            int components = accessorComponentCount(accessor);
+            int count = accessor.get("count").getAsInt();
+            int dracoAttributeId = entry.getValue().getAsInt();
+            attributeSpecs.put(name, new DracoAttributeSpec(dracoAttributeId, components, count));
+        }
+
+        DracoDecoder decoder = DracoDecoder.getInstance();
+        DracoDecoder.DecodedDracoMesh decoded = decoder.decode(compressed, attributeSpecs);
+        if (decoded == null) {
+            return null;
+        }
+        float[] positions = decoded.attributes().get("POSITION");
+        if (positions == null) {
+            logger.warn("Draco primitive missing POSITION attribute");
+            return null;
+        }
+        float[] normals = decoded.attributes().get("NORMAL");
+        float[] texCoords0 = decoded.attributes().get("TEXCOORD_0");
+        float[] texCoords1 = decoded.attributes().get("TEXCOORD_1");
+        int vertexCount = positions != null ? positions.length / 3 : decoded.vertexCount();
+        if (normals == null) {
+            normals = defaultNormals(vertexCount);
+        }
+        int[] indices = decoded.indices();
+        if (indices == null || indices.length == 0) {
+            indices = sequentialIndices(vertexCount);
+        }
+        return new DracoMesh(positions, normals, texCoords0, texCoords1, indices);
+    }
+
+    private int accessorComponentCount(JsonObject accessor) {
+        String type = accessor.get("type").getAsString();
+        return switch (type) {
+            case "SCALAR" -> 1;
+            case "VEC2" -> 2;
+            case "VEC3" -> 3;
+            case "VEC4" -> 4;
+            case "MAT2" -> 4;
+            case "MAT3" -> 9;
+            case "MAT4" -> 16;
+            default -> throw new IllegalArgumentException("Unsupported accessor type: " + type);
+        };
     }
 
     private float[] readNodeTransform(JsonObject node) {
@@ -587,9 +669,36 @@ public final class GltfModelImporter implements ModelImporter {
         int componentType = accessor.get("componentType").getAsInt();
         boolean normalized = accessor.has("normalized") && accessor.get("normalized").getAsBoolean();
 
+        float[] values = readFloatAccessorData(accessor, bufferViews, bufferBytes, count, componentType, normalized,
+                components);
+        if (accessor.has("sparse")) {
+            applySparseFloats(accessor.getAsJsonObject("sparse"), values, componentType, normalized, components,
+                    bufferViews, bufferBytes);
+        }
+        return values;
+    }
+
+    private int[] readIndices(JsonArray accessors, JsonArray bufferViews, byte[][] bufferBytes, int accessorIndex) {
+        JsonObject accessor = accessors.get(accessorIndex).getAsJsonObject();
+        int count = accessor.get("count").getAsInt();
+        int componentType = accessor.get("componentType").getAsInt();
+
+        int[] indices = readIndicesAccessorData(accessor, bufferViews, bufferBytes, count, componentType);
+        if (accessor.has("sparse")) {
+            applySparseIndices(accessor.getAsJsonObject("sparse"), indices, componentType, bufferViews, bufferBytes);
+        }
+        return indices;
+    }
+
+    private float[] readFloatAccessorData(
+            JsonObject accessor,
+            JsonArray bufferViews,
+            byte[][] bufferBytes,
+            int count,
+            int componentType,
+            boolean normalized,
+            int components) {
         if (!accessor.has("bufferView")) {
-            // Likely a sparse accessor with no base view, or Dracro compressed.
-            // Return zeros.
             return new float[count * components];
         }
 
@@ -615,16 +724,48 @@ public final class GltfModelImporter implements ModelImporter {
         return values;
     }
 
-    private int[] readIndices(JsonArray accessors, JsonArray bufferViews, byte[][] bufferBytes, int accessorIndex) {
-        JsonObject accessor = accessors.get(accessorIndex).getAsJsonObject();
-        int count = accessor.get("count").getAsInt();
+    private void applySparseFloats(
+            JsonObject sparse,
+            float[] values,
+            int componentType,
+            boolean normalized,
+            int components,
+            JsonArray bufferViews,
+            byte[][] bufferBytes) {
+        int sparseCount = sparse.get("count").getAsInt();
+        JsonObject indices = sparse.getAsJsonObject("indices");
+        JsonObject sparseValues = sparse.getAsJsonObject("values");
 
+        ByteBuffer indicesBuffer = bufferForView(indices, bufferViews, bufferBytes);
+        ByteBuffer valuesBuffer = bufferForView(sparseValues, bufferViews, bufferBytes);
+        int indexComponentType = indices.get("componentType").getAsInt();
+        int indexComponentSize = componentSize(indexComponentType);
+        int valueComponentSize = componentSize(componentType);
+        int indicesOffset = indices.has("byteOffset") ? indices.get("byteOffset").getAsInt() : 0;
+        int valuesOffset = sparseValues.has("byteOffset") ? sparseValues.get("byteOffset").getAsInt() : 0;
+
+        for (int i = 0; i < sparseCount; i++) {
+            int indexOffset = indicesOffset + i * indexComponentSize;
+            int vertexIndex = readIndexComponent(indicesBuffer, indexOffset, indexComponentType);
+            int valueBase = valuesOffset + i * valueComponentSize * components;
+            int destBase = vertexIndex * components;
+            for (int c = 0; c < components; c++) {
+                int valueOffset = valueBase + c * valueComponentSize;
+                values[destBase + c] = readComponentAsFloat(valuesBuffer, valueOffset, componentType, normalized);
+            }
+        }
+    }
+
+    private int[] readIndicesAccessorData(
+            JsonObject accessor,
+            JsonArray bufferViews,
+            byte[][] bufferBytes,
+            int count,
+            int componentType) {
         if (!accessor.has("bufferView")) {
-            // Missing bufferView for indices. Return zeros (degenerate mesh).
             return new int[count];
         }
 
-        int componentType = accessor.get("componentType").getAsInt();
         int bufferViewIndex = accessor.get("bufferView").getAsInt();
         int byteOffset = accessor.has("byteOffset") ? accessor.get("byteOffset").getAsInt() : 0;
 
@@ -645,6 +786,31 @@ public final class GltfModelImporter implements ModelImporter {
             };
         }
         return indices;
+    }
+
+    private void applySparseIndices(
+            JsonObject sparse,
+            int[] indices,
+            int componentType,
+            JsonArray bufferViews,
+            byte[][] bufferBytes) {
+        int sparseCount = sparse.get("count").getAsInt();
+        JsonObject sparseIndices = sparse.getAsJsonObject("indices");
+        JsonObject sparseValues = sparse.getAsJsonObject("values");
+        int indexComponentType = sparseIndices.get("componentType").getAsInt();
+        int indexComponentSize = componentSize(indexComponentType);
+        int valueComponentSize = componentSize(componentType);
+        int indicesOffset = sparseIndices.has("byteOffset") ? sparseIndices.get("byteOffset").getAsInt() : 0;
+        int valuesOffset = sparseValues.has("byteOffset") ? sparseValues.get("byteOffset").getAsInt() : 0;
+        ByteBuffer indicesBuffer = bufferForView(sparseIndices, bufferViews, bufferBytes);
+        ByteBuffer valuesBuffer = bufferForView(sparseValues, bufferViews, bufferBytes);
+
+        for (int i = 0; i < sparseCount; i++) {
+            int indexOffset = indicesOffset + i * indexComponentSize;
+            int accessorIndex = readIndexComponent(indicesBuffer, indexOffset, indexComponentType);
+            int valueOffset = valuesOffset + i * valueComponentSize;
+            indices[accessorIndex] = readIndexComponent(valuesBuffer, valueOffset, componentType);
+        }
     }
 
     private int componentSize(int componentType) {
@@ -685,12 +851,42 @@ public final class GltfModelImporter implements ModelImporter {
         return (float) (value / max);
     }
 
+    private int readIndexComponent(ByteBuffer buffer, int offset, int componentType) {
+        return switch (componentType) {
+            case 5121 -> buffer.get(offset) & 0xFF;
+            case 5123 -> buffer.getShort(offset) & 0xFFFF;
+            case 5125 -> buffer.getInt(offset);
+            default -> throw new IllegalArgumentException("Unsupported index component type");
+        };
+    }
+
+    private ByteBuffer bufferForView(JsonObject viewOwner, JsonArray bufferViews, byte[][] bufferBytes) {
+        int bufferViewIndex = viewOwner.get("bufferView").getAsInt();
+        JsonObject bufferView = bufferViews.get(bufferViewIndex).getAsJsonObject();
+        int viewOffset = bufferView.has("byteOffset") ? bufferView.get("byteOffset").getAsInt() : 0;
+        ByteBuffer buffer = ByteBuffer.wrap(bufferBytesForView(bufferView, bufferBytes)).order(ByteOrder.LITTLE_ENDIAN);
+        buffer.position(viewOffset);
+        return buffer.slice().order(ByteOrder.LITTLE_ENDIAN);
+    }
+
     private byte[] bufferBytesForView(JsonObject bufferView, byte[][] bufferBytes) {
         int bufferIndex = bufferView.has("buffer") ? bufferView.get("buffer").getAsInt() : 0;
         if (bufferIndex < 0 || bufferIndex >= bufferBytes.length || bufferBytes[bufferIndex] == null) {
             throw new IllegalArgumentException("glTF buffer index out of range: " + bufferIndex);
         }
         return bufferBytes[bufferIndex];
+    }
+
+    private byte[] readBufferViewBytes(JsonObject bufferView, byte[][] bufferBytes) {
+        byte[] source = bufferBytesForView(bufferView, bufferBytes);
+        int offset = bufferView.has("byteOffset") ? bufferView.get("byteOffset").getAsInt() : 0;
+        int length = bufferView.get("byteLength").getAsInt();
+        if (offset + length > source.length) {
+            throw new IllegalArgumentException("glTF bufferView exceeds buffer length");
+        }
+        byte[] slice = new byte[length];
+        System.arraycopy(source, offset, slice, 0, length);
+        return slice;
     }
 
     private static float[] defaultNormals(int vertexCount) {
@@ -715,5 +911,11 @@ public final class GltfModelImporter implements ModelImporter {
     }
 
     private record GltfAsset(JsonObject root, byte[][] buffers) {
+    }
+
+    record DracoAttributeSpec(int attributeId, int components, int count) {
+    }
+
+    private record DracoMesh(float[] positions, float[] normals, float[] texCoords0, float[] texCoords1, int[] indices) {
     }
 }
