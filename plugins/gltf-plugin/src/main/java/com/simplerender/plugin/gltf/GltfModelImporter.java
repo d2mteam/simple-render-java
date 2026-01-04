@@ -60,7 +60,7 @@ public final class GltfModelImporter implements ModelImporter {
                         materialCache,
                         textureCache
                     );
-                    importedPrimitives.add(new ImportedPrimitive(primitive.meshData(), material));
+                    importedPrimitives.add(new ImportedPrimitive(primitive.meshData(), material, primitive.transform()));
                 }
             }
             return new ImportedModel(importedPrimitives);
@@ -163,12 +163,11 @@ public final class GltfModelImporter implements ModelImporter {
             float[] texCoords1 = texCoord1AccessorIndex >= 0
                 ? readFloatVec2(accessors, bufferViews, bufferBytes, texCoord1AccessorIndex)
                 : null;
-            applyTransform(positions, normals, transform);
             int[] indices = indexAccessorIndex >= 0
                 ? readIndices(accessors, bufferViews, bufferBytes, indexAccessorIndex)
                 : sequentialIndices(positions.length / 3);
             MeshData meshData = new MeshData(positions, normals, texCoords0, texCoords1, indices);
-            primitives.add(new PrimitiveMesh(meshData, materialIndex));
+            primitives.add(new PrimitiveMesh(meshData, materialIndex, transform));
         }
     }
 
@@ -236,39 +235,6 @@ public final class GltfModelImporter implements ModelImporter {
         translationMatrix[13] = translation[1];
         translationMatrix[14] = translation[2];
         return Matrix4f.multiply(translationMatrix, rotationScale);
-    }
-
-    private void applyTransform(float[] positions, float[] normals, float[] matrix) {
-        for (int i = 0; i < positions.length; i += 3) {
-            float x = positions[i];
-            float y = positions[i + 1];
-            float z = positions[i + 2];
-            positions[i] = matrix[0] * x + matrix[4] * y + matrix[8] * z + matrix[12];
-            positions[i + 1] = matrix[1] * x + matrix[5] * y + matrix[9] * z + matrix[13];
-            positions[i + 2] = matrix[2] * x + matrix[6] * y + matrix[10] * z + matrix[14];
-        }
-        if (normals == null) {
-            return;
-        }
-        float[] normalMatrix = computeNormalMatrix(matrix);
-        for (int i = 0; i < normals.length; i += 3) {
-            float x = normals[i];
-            float y = normals[i + 1];
-            float z = normals[i + 2];
-            float nx = normalMatrix[0] * x + normalMatrix[3] * y + normalMatrix[6] * z;
-            float ny = normalMatrix[1] * x + normalMatrix[4] * y + normalMatrix[7] * z;
-            float nz = normalMatrix[2] * x + normalMatrix[5] * y + normalMatrix[8] * z;
-            float length = (float) Math.sqrt(nx * nx + ny * ny + nz * nz);
-            if (length == 0.0f) {
-                normals[i] = 0.0f;
-                normals[i + 1] = 1.0f;
-                normals[i + 2] = 0.0f;
-            } else {
-                normals[i] = nx / length;
-                normals[i + 1] = ny / length;
-                normals[i + 2] = nz / length;
-            }
-        }
     }
 
     private float[] computeNormalMatrix(float[] matrix) {
@@ -779,7 +745,7 @@ public final class GltfModelImporter implements ModelImporter {
         return indices;
     }
 
-    private record PrimitiveMesh(MeshData meshData, int materialIndex) {
+    private record PrimitiveMesh(MeshData meshData, int materialIndex, float[] transform) {
     }
 
     private record GltfAsset(JsonObject root, byte[][] buffers) {

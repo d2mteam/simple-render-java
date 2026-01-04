@@ -15,6 +15,6 @@ public interface ModelImporter extends ExtensionPoint {
     record ImportedModel(List<ImportedPrimitive> primitives) {
     }
 
-    record ImportedPrimitive(MeshData meshData, MaterialData materialData) {
+    record ImportedPrimitive(MeshData meshData, MaterialData materialData, float[] transform) {
     }
 }
