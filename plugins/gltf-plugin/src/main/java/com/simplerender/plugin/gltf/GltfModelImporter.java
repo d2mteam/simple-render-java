@@ -12,6 +12,9 @@ import com.simplerender.asset.TextureColorSpace;
 import com.simplerender.asset.TextureSlot;
 import com.simplerender.asset.plugin.ModelImporter;
 import com.simplerender.math.Matrix4f;
+import org.lwjgl.assimp.AIBlob;
+import org.lwjgl.assimp.AIScene;
+import org.lwjgl.assimp.Assimp;
 import org.pf4j.Extension;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -42,6 +45,10 @@ public final class GltfModelImporter implements ModelImporter {
     public ImportedModel importModel(Path path) {
         try {
             GltfAsset asset = loadAsset(path);
+            if (usesDracoCompression(asset.root())) {
+                logger.info("Draco-compressed glTF detected. Decoding via Assimp.");
+                asset = decodeDracoAsset(path);
+            }
             JsonObject root = asset.root();
             byte[][] bufferBytes = asset.buffers();
 
@@ -333,6 +340,10 @@ public final class GltfModelImporter implements ModelImporter {
 
     private GltfAsset loadGlb(Path path) throws Exception {
         byte[] bytes = Files.readAllBytes(path);
+        return loadGlbBytes(bytes, path.getParent());
+    }
+
+    private GltfAsset loadGlbBytes(byte[] bytes, Path baseDir) throws Exception {
         ByteBuffer buffer = ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN);
         int magic = buffer.getInt();
         if (magic != 0x46546C67) { // "glTF"
@@ -358,13 +369,67 @@ public final class GltfModelImporter implements ModelImporter {
         buffer.get(binBytes);
 
         JsonObject root = JsonParser.parseString(json).getAsJsonObject();
-        byte[][] bufferBytes = readBuffers(root, path.getParent());
+        Path resolvedBase = baseDir == null ? Path.of(".") : baseDir;
+        byte[][] bufferBytes = readBuffers(root, resolvedBase);
         if (bufferBytes.length == 0) {
             bufferBytes = new byte[][] { binBytes };
         } else {
             bufferBytes[0] = binBytes;
         }
         return new GltfAsset(root, bufferBytes);
+    }
+
+    private boolean usesDracoCompression(JsonObject root) {
+        if (root.has("extensionsUsed")) {
+            JsonArray extensionsUsed = root.getAsJsonArray("extensionsUsed");
+            for (int i = 0; i < extensionsUsed.size(); i++) {
+                if ("KHR_draco_mesh_compression".equals(extensionsUsed.get(i).getAsString())) {
+                    return true;
+                }
+            }
+        }
+        if (!root.has("meshes")) {
+            return false;
+        }
+        JsonArray meshes = root.getAsJsonArray("meshes");
+        for (int i = 0; i < meshes.size(); i++) {
+            JsonObject mesh = meshes.get(i).getAsJsonObject();
+            JsonArray primitives = mesh.getAsJsonArray("primitives");
+            if (primitives == null) {
+                continue;
+            }
+            for (int p = 0; p < primitives.size(); p++) {
+                JsonObject primitive = primitives.get(p).getAsJsonObject();
+                if (primitive.has("extensions")) {
+                    JsonObject extensions = primitive.getAsJsonObject("extensions");
+                    if (extensions.has("KHR_draco_mesh_compression")) {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
+    }
+
+    private GltfAsset decodeDracoAsset(Path path) throws Exception {
+        int flags = Assimp.aiProcess_Triangulate
+                | Assimp.aiProcess_JoinIdenticalVertices
+                | Assimp.aiProcess_GenNormals;
+        AIScene scene = Assimp.aiImportFile(path.toString(), flags);
+        if (scene == null) {
+            throw new IllegalStateException("Assimp failed to import Draco glTF: " + Assimp.aiGetErrorString());
+        }
+        AIBlob blob = Assimp.aiExportSceneToBlob(scene, "glb2", 0);
+        Assimp.aiReleaseImport(scene);
+        if (blob == null) {
+            throw new IllegalStateException("Assimp failed to export decoded GLB: " + Assimp.aiGetErrorString());
+        }
+        byte[] decodedBytes = new byte[blob.size()];
+        ByteBuffer blobData = blob.data();
+        blobData.rewind();
+        blobData.get(decodedBytes);
+        Assimp.aiReleaseExportBlob(blob);
+        return loadGlbBytes(decodedBytes, path.getParent());
     }
 
     private byte[] decodeUri(String uri, Path base) throws Exception {

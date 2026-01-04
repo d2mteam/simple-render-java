@@ -9,6 +9,8 @@ repositories {
     mavenCentral()
 }
 
+def lwjglVersion = "3.3.3"
+
 dependencies {
     implementation 'org.graalvm.js:js:23.1.2'
     implementation 'org.graalvm.js:js-scriptengine:23.1.2'
