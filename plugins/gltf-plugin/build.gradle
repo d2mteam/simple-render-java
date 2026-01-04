@@ -9,7 +9,11 @@ repositories {
     mavenCentral()
 }
 
+def lwjglVersion = "3.3.3"
+
 dependencies {
+    implementation platform("org.lwjgl:lwjgl-bom:$lwjglVersion")
+    implementation "org.lwjgl:lwjgl-assimp"
     implementation 'org.pf4j:pf4j:3.12.0'
     annotationProcessor 'org.pf4j:pf4j:3.12.0'
     implementation 'com.google.code.gson:gson:2.11.0'

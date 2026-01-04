@@ -24,9 +24,11 @@ dependencies {
     implementation "org.lwjgl:lwjgl"
     implementation "org.lwjgl:lwjgl-glfw"
     implementation "org.lwjgl:lwjgl-opengl"
+    implementation "org.lwjgl:lwjgl-assimp"
     runtimeOnly "org.lwjgl:lwjgl::$lwjglNatives"
     runtimeOnly "org.lwjgl:lwjgl-glfw::$lwjglNatives"
     runtimeOnly "org.lwjgl:lwjgl-opengl::$lwjglNatives"
+    runtimeOnly "org.lwjgl:lwjgl-assimp::$lwjglNatives"
     implementation 'org.slf4j:slf4j-api:2.0.13'
     runtimeOnly 'ch.qos.logback:logback-classic:1.5.13'
     implementation 'org.pf4j:pf4j:3.12.0'
