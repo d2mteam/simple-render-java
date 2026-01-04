@@ -8,7 +8,7 @@ import com.simplerender.asset.ShaderSourceLoader;
 import com.simplerender.asset.TextureData;
 import com.simplerender.asset.TextureDataFactory;
 import com.simplerender.asset.TextureColorSpace;
-import com.simplerender.math.Matrix4f;
+import com.simplerender.math.Vector3f;
 import com.simplerender.render.MaterialHandle;
 import com.simplerender.render.MeshHandle;
 import com.simplerender.render.MeshUploader;
@@ -357,7 +357,8 @@ public final class OpenGLRenderer implements MeshUploader {
         uniforms.updateView(snapshot.camera().position(), snapshot.camera().forward(), snapshot.camera().up());
         shaderProgram.setUniformMat4("uProjection", uniforms.projectionMatrix());
         shaderProgram.setUniformMat4("uView", uniforms.viewMatrix());
-        shaderProgram.setUniformVec3("uCameraPos", snapshot.camera().position());
+        float[] cameraPosition = toVec3(snapshot.camera().position());
+        shaderProgram.setUniformVec3("uCameraPos", cameraPosition);
         applyLightUniforms();
         pipeline.updateFrustum(uniforms.projectionMatrix(), uniforms.viewMatrix());
         RenderItem[] renderItems = snapshot.renderItems();
@@ -611,6 +612,10 @@ public final class OpenGLRenderer implements MeshUploader {
             task.run();
             return null;
         });
+    }
+
+    private static float[] toVec3(Vector3f value) {
+        return new float[] {value.x(), value.y(), value.z()};
     }
 
     private void drainPendingTasks() {
