@@ -13,32 +13,36 @@ public final class Main {
 
     public static void main(String[] args) {
         EngineConfig config = EngineConfig.defaultConfig();
-        String shaderName = parseShaderName(args);
+        String shaderName = parseArg(args, "--shader");
         if (shaderName != null) {
             config = config.withShaderName(shaderName);
         }
+        String modelPath = parseArg(args, "--model");
+        if (modelPath != null) {
+            config = config.withModelPath(modelPath);
+        }
         logger.info(
-            "Starting Simple Render (shader={})",
-            config.shaderName()
-        );
+                "Starting Simple Render (shader={})",
+                config.shaderName());
         GameApplication application = new GameApplication(config);
         application.run();
     }
 
-    private static String parseShaderName(String[] args) {
+    private static String parseArg(String[] args, String key) {
         if (args == null || args.length == 0) {
             return null;
         }
+        String keyEq = key + "=";
         for (int i = 0; i < args.length; i++) {
             String arg = args[i];
             if (arg == null) {
                 continue;
             }
-            if (arg.startsWith("--shader=")) {
-                String value = arg.substring("--shader=".length());
+            if (arg.startsWith(keyEq)) {
+                String value = arg.substring(keyEq.length());
                 return value.isBlank() ? null : value;
             }
-            if (arg.equals("--shader") && i + 1 < args.length) {
+            if (arg.equals(key) && i + 1 < args.length) {
                 String value = args[i + 1];
                 return value == null || value.isBlank() ? null : value;
             }

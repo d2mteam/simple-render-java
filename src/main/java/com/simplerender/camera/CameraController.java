@@ -8,7 +8,7 @@ public final class CameraController {
     private float pitch = 0.0f;
 
     public void update(Camera camera, Time time, InputState inputState) {
-        float sensitivity = 0.15f;
+        float sensitivity = 0.25f;
         yaw += (float) inputState.mouseDeltaX() * sensitivity;
         pitch -= (float) inputState.mouseDeltaY() * sensitivity;
         if (pitch > 89.0f) {
@@ -30,7 +30,7 @@ public final class CameraController {
             camera.forward().setZ(fz / fLen);
         }
 
-        float speed = 4.0f * time.deltaSeconds();
+        float speed = 10.0f * time.deltaSeconds();
         float moveX = 0.0f;
         float moveY = 0.0f;
         float moveZ = 0.0f;

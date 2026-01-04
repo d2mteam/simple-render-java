@@ -41,7 +41,7 @@ final class ShaderProgram {
     public void setUniformMat4(String name, float[] matrix) {
         int location = GL20.glGetUniformLocation(programId, name);
         if (location < 0) {
-            logger.error("Uniform {} not found", name);
+            logger.debug("Uniform {} not found", name);
             return;
         }
         matrixBuffer.clear();
@@ -52,7 +52,7 @@ final class ShaderProgram {
     public void setUniformVec3(String name, float[] vec3) {
         int location = GL20.glGetUniformLocation(programId, name);
         if (location < 0) {
-            logger.error("Uniform {} not found", name);
+            logger.debug("Uniform {} not found", name);
             return;
         }
         GL20.glUniform3f(location, vec3[0], vec3[1], vec3[2]);
@@ -61,7 +61,7 @@ final class ShaderProgram {
     public void setUniformVec2(String name, float[] vec2) {
         int location = GL20.glGetUniformLocation(programId, name);
         if (location < 0) {
-            logger.error("Uniform {} not found", name);
+            logger.debug("Uniform {} not found", name);
             return;
         }
         GL20.glUniform2f(location, vec2[0], vec2[1]);
@@ -70,7 +70,7 @@ final class ShaderProgram {
     public void setUniformVec4(String name, float[] vec4) {
         int location = GL20.glGetUniformLocation(programId, name);
         if (location < 0) {
-            logger.error("Uniform {} not found", name);
+            logger.debug("Uniform {} not found", name);
             return;
         }
         GL20.glUniform4f(location, vec4[0], vec4[1], vec4[2], vec4[3]);
@@ -79,7 +79,7 @@ final class ShaderProgram {
     public void setUniformFloat(String name, float value) {
         int location = GL20.glGetUniformLocation(programId, name);
         if (location < 0) {
-            logger.error("Uniform {} not found", name);
+            logger.debug("Uniform {} not found", name);
             return;
         }
         GL20.glUniform1f(location, value);
@@ -88,7 +88,7 @@ final class ShaderProgram {
     public void setUniformInt(String name, int value) {
         int location = GL20.glGetUniformLocation(programId, name);
         if (location < 0) {
-            logger.error("Uniform {} not found", name);
+            logger.debug("Uniform {} not found", name);
             return;
         }
         GL20.glUniform1i(location, value);

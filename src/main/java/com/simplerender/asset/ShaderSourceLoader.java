@@ -20,6 +20,7 @@ public final class ShaderSourceLoader {
         return switch (resolved) {
             case DEFAULT_SHADER -> load("shaders/default.vert", "shaders/default.frag");
             case DISNEY_BRDF_SHADER -> load("shaders/disney_brdf.vert", "shaders/disney_brdf.frag");
+            case "debug_mesh" -> load("shaders/debug_mesh.vert", "shaders/debug_mesh.frag");
             default -> {
                 logger.warn("Unknown shader '{}', falling back to {}", resolved, DEFAULT_SHADER);
                 yield load("shaders/default.vert", "shaders/default.frag");

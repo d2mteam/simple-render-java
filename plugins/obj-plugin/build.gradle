@@ -24,4 +24,5 @@ jar {
             'Plugin-Provider': 'simple-render'
         )
     }
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 }

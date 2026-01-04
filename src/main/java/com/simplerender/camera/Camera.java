@@ -8,7 +8,7 @@ public final class Camera {
     private final Vector3f up;
 
     public Camera() {
-        this.position = new Vector3f(0.0f, 0.0f, 0.0f);
+        this.position = new Vector3f(0.0f, 0.0f, 5.0f);
         this.forward = new Vector3f(0.0f, 0.0f, -1.0f);
         this.up = new Vector3f(0.0f, 1.0f, 0.0f);
     }

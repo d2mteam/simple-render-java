@@ -33,7 +33,6 @@ public final class GameApplication {
         Optional<ModelImporter.ImportedModel> importedModel;
         if (configModelPath != null && !configModelPath.isBlank()) {
             Path path = Path.of(configModelPath);
-            modelPath = Optional.of(path);
             logger.info("Model import source: config path ({})", path);
             importedModel = importService.importModel(path);
             if (importedModel.isEmpty()) {

@@ -7,11 +7,10 @@ public final class EngineConfig {
     private final String shaderName;
 
     public EngineConfig(
-        int targetFps,
-        int maxFrames,
-        String modelPath,
-        String shaderName
-    ) {
+            int targetFps,
+            int maxFrames,
+            String modelPath,
+            String shaderName) {
         this.targetFps = targetFps;
         this.maxFrames = maxFrames;
         this.modelPath = modelPath;
@@ -43,6 +42,6 @@ public final class EngineConfig {
     }
 
     public static EngineConfig defaultConfig() {
-        return new EngineConfig(60, 3, null, "default");
+        return new EngineConfig(60, -1, null, "default");
     }
 }

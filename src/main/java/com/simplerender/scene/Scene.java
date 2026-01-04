@@ -22,10 +22,9 @@ public final class Scene {
     private final List<RenderItem> renderItems;
 
     private Scene(
-        Camera camera,
-        CameraController cameraController,
-        List<RenderItem> renderItems
-    ) {
+            Camera camera,
+            CameraController cameraController,
+            List<RenderItem> renderItems) {
         this.camera = camera;
         this.cameraController = cameraController;
         this.renderItems = renderItems;
@@ -95,11 +94,12 @@ public final class Scene {
     private static List<RenderItem> createFromImported(MeshUploader meshUploader, ModelImporter.ImportedModel model) {
         List<RenderItem> items = new ArrayList<>();
         for (ModelImporter.ImportedPrimitive primitive : model.primitives()) {
+            Transform t = new Transform(primitive.transform());
+            t.setScale(0.1f); // Default scale down for large models
             items.add(new RenderItem(
-                meshUploader.uploadMesh(primitive.meshData()),
-                meshUploader.uploadMaterial(primitive.materialData()),
-                new Transform(primitive.transform())
-            ));
+                    meshUploader.uploadMesh(primitive.meshData()),
+                    meshUploader.uploadMaterial(primitive.materialData()),
+                    t));
         }
         return items;
     }

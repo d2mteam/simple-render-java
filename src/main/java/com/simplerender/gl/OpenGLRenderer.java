@@ -106,8 +106,8 @@ public final class OpenGLRenderer implements MeshUploader {
         uploadQueue.process();
         applyPendingShader();
         RenderGraph graph = uniforms.screenSpaceSettings().rayTracingEnabled()
-            ? renderGraphWithRayTracing
-            : renderGraph;
+                ? renderGraphWithRayTracing
+                : renderGraph;
         graph.execute(new RenderGraphContext(this, snapshot));
         GL30.glBindFramebuffer(GL30.GL_FRAMEBUFFER, 0);
         GL11.glFlush();
@@ -133,10 +133,9 @@ public final class OpenGLRenderer implements MeshUploader {
         ensureInitialized();
         MeshHandle handle = resourceManager.createMeshHandle();
         uploadQueue.enqueue(() -> resourceManager.uploadMesh(
-            handle,
-            meshData,
-            MeshUploadMode.STATIC_ONE_SHOT
-        ));
+                handle,
+                meshData,
+                MeshUploadMode.STATIC_ONE_SHOT));
         return handle;
     }
 
@@ -145,18 +144,16 @@ public final class OpenGLRenderer implements MeshUploader {
         ensureInitialized();
         MaterialHandle handle = resourceManager.createMaterialHandle();
         uploadQueue.enqueue(() -> resourceManager.uploadMaterial(
-            handle,
-            materialData,
-            textureData -> {
-                TextureHandle textureHandle = resourceManager.createTextureHandle();
-                resourceManager.registerTexture(
-                    textureHandle,
-                    uploadQueue.textureStreamingUploader().upload(textureData)
-                );
-                return textureHandle;
-            },
-            resourceManager::uploadSampler
-        ));
+                handle,
+                materialData,
+                textureData -> {
+                    TextureHandle textureHandle = resourceManager.createTextureHandle();
+                    resourceManager.registerTexture(
+                            textureHandle,
+                            uploadQueue.textureStreamingUploader().upload(textureData));
+                    return textureHandle;
+                },
+                resourceManager::uploadSampler));
         return handle;
     }
 
@@ -165,9 +162,8 @@ public final class OpenGLRenderer implements MeshUploader {
         ensureInitialized();
         TextureHandle handle = resourceManager.createTextureHandle();
         uploadQueue.enqueue(() -> resourceManager.registerTexture(
-            handle,
-            uploadQueue.textureStreamingUploader().upload(textureData)
-        ));
+                handle,
+                uploadQueue.textureStreamingUploader().upload(textureData)));
         return handle;
     }
 
@@ -175,9 +171,8 @@ public final class OpenGLRenderer implements MeshUploader {
         ensureInitialized();
         TextureHandle handle = resourceManager.createTextureHandle();
         uploadQueue.enqueue(() -> resourceManager.registerTexture(
-            handle,
-            uploadQueue.sparseTextureUploader().upload(textureData)
-        ));
+                handle,
+                uploadQueue.sparseTextureUploader().upload(textureData)));
         return handle;
     }
 
@@ -208,22 +203,20 @@ public final class OpenGLRenderer implements MeshUploader {
         GLFW.glfwMakeContextCurrent(window);
         GL.createCapabilities();
         uploadQueue = new UploadQueue(
-            new StaticMeshUploader(),
-            new TextureStreamingUploader(3),
-            new SparseTextureUploader(),
-            new DynamicVboUploader(),
-            new EcsRenderDataDoubleBuffer(1024)
-        );
+                new StaticMeshUploader(),
+                new TextureStreamingUploader(3),
+                new SparseTextureUploader(),
+                new DynamicVboUploader(),
+                new EcsRenderDataDoubleBuffer(1024));
         GL11.glEnable(GL11.GL_DEPTH_TEST);
         GL11.glClearColor(0.12f, 0.12f, 0.12f, 1.0f);
         uniforms = new RenderUniforms(1.0f);
         resourceManager.initDefaultTextures(
-            TextureDataFactory.solidColor(255, 255, 255, 255, TextureColorSpace.SRGB),
-            TextureDataFactory.solidColor(128, 128, 255, 255),
-            TextureDataFactory.solidColor(0, 255, 0, 255),
-            TextureDataFactory.solidColor(255, 255, 255, 255),
-            TextureDataFactory.solidColor(0, 0, 0, 255, TextureColorSpace.SRGB)
-        );
+                TextureDataFactory.solidColor(255, 255, 255, 255, TextureColorSpace.SRGB),
+                TextureDataFactory.solidColor(128, 128, 255, 255),
+                TextureDataFactory.solidColor(0, 255, 0, 255),
+                TextureDataFactory.solidColor(255, 255, 255, 255),
+                TextureDataFactory.solidColor(0, 0, 0, 255, TextureColorSpace.SRGB));
         resourceManager.initDefaultSampler(SamplerData.defaults());
         ShaderSource shaderSource = ShaderSourceLoader.loadByName(pendingShaderName);
         shaderProgram.init(shaderSource.vertexSource(), shaderSource.fragmentSource());
@@ -274,26 +267,28 @@ public final class OpenGLRenderer implements MeshUploader {
 
         GL30.glBindFramebuffer(GL30.GL_FRAMEBUFFER, sceneFramebuffer);
         GL11.glBindTexture(GL11.GL_TEXTURE_2D, sceneColorTexture);
-        GL11.glTexImage2D(GL11.GL_TEXTURE_2D, 0, GL11.GL_RGBA8, width, height, 0, GL11.GL_RGBA, GL11.GL_UNSIGNED_BYTE, (ByteBuffer) null);
+        GL11.glTexImage2D(GL11.GL_TEXTURE_2D, 0, GL11.GL_RGBA8, width, height, 0, GL11.GL_RGBA, GL11.GL_UNSIGNED_BYTE,
+                (ByteBuffer) null);
         GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MIN_FILTER, GL11.GL_LINEAR);
         GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MAG_FILTER, GL11.GL_LINEAR);
-        GL30.glFramebufferTexture2D(GL30.GL_FRAMEBUFFER, GL30.GL_COLOR_ATTACHMENT0, GL11.GL_TEXTURE_2D, sceneColorTexture, 0);
+        GL30.glFramebufferTexture2D(GL30.GL_FRAMEBUFFER, GL30.GL_COLOR_ATTACHMENT0, GL11.GL_TEXTURE_2D,
+                sceneColorTexture, 0);
 
         GL11.glBindTexture(GL11.GL_TEXTURE_2D, sceneDepthTexture);
         GL11.glTexImage2D(
-            GL11.GL_TEXTURE_2D,
-            0,
-            GL30.GL_DEPTH24_STENCIL8,
-            width,
-            height,
-            0,
-            GL30.GL_DEPTH_STENCIL,
-            GL30.GL_UNSIGNED_INT_24_8,
-            (ByteBuffer) null
-        );
+                GL11.GL_TEXTURE_2D,
+                0,
+                GL30.GL_DEPTH24_STENCIL8,
+                width,
+                height,
+                0,
+                GL30.GL_DEPTH_STENCIL,
+                GL30.GL_UNSIGNED_INT_24_8,
+                (ByteBuffer) null);
         GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MIN_FILTER, GL11.GL_NEAREST);
         GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MAG_FILTER, GL11.GL_NEAREST);
-        GL30.glFramebufferTexture2D(GL30.GL_FRAMEBUFFER, GL30.GL_DEPTH_STENCIL_ATTACHMENT, GL11.GL_TEXTURE_2D, sceneDepthTexture, 0);
+        GL30.glFramebufferTexture2D(GL30.GL_FRAMEBUFFER, GL30.GL_DEPTH_STENCIL_ATTACHMENT, GL11.GL_TEXTURE_2D,
+                sceneDepthTexture, 0);
 
         int status = GL30.glCheckFramebufferStatus(GL30.GL_FRAMEBUFFER);
         if (status != GL30.GL_FRAMEBUFFER_COMPLETE) {
@@ -302,16 +297,19 @@ public final class OpenGLRenderer implements MeshUploader {
 
         GL30.glBindFramebuffer(GL30.GL_FRAMEBUFFER, postFramebuffer);
         GL11.glBindTexture(GL11.GL_TEXTURE_2D, postColorTexture);
-        GL11.glTexImage2D(GL11.GL_TEXTURE_2D, 0, GL11.GL_RGBA8, width, height, 0, GL11.GL_RGBA, GL11.GL_UNSIGNED_BYTE, (ByteBuffer) null);
+        GL11.glTexImage2D(GL11.GL_TEXTURE_2D, 0, GL11.GL_RGBA8, width, height, 0, GL11.GL_RGBA, GL11.GL_UNSIGNED_BYTE,
+                (ByteBuffer) null);
         GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MIN_FILTER, GL11.GL_LINEAR);
         GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MAG_FILTER, GL11.GL_LINEAR);
-        GL30.glFramebufferTexture2D(GL30.GL_FRAMEBUFFER, GL30.GL_COLOR_ATTACHMENT0, GL11.GL_TEXTURE_2D, postColorTexture, 0);
+        GL30.glFramebufferTexture2D(GL30.GL_FRAMEBUFFER, GL30.GL_COLOR_ATTACHMENT0, GL11.GL_TEXTURE_2D,
+                postColorTexture, 0);
         status = GL30.glCheckFramebufferStatus(GL30.GL_FRAMEBUFFER);
         if (status != GL30.GL_FRAMEBUFFER_COMPLETE) {
             logger.error("Post framebuffer incomplete with status {}", status);
         }
         GL11.glBindTexture(GL11.GL_TEXTURE_2D, rayTracingTexture);
-        GL11.glTexImage2D(GL11.GL_TEXTURE_2D, 0, GL30.GL_RGBA16F, width, height, 0, GL11.GL_RGBA, GL11.GL_FLOAT, (ByteBuffer) null);
+        GL11.glTexImage2D(GL11.GL_TEXTURE_2D, 0, GL30.GL_RGBA16F, width, height, 0, GL11.GL_RGBA, GL11.GL_FLOAT,
+                (ByteBuffer) null);
         GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MIN_FILTER, GL11.GL_LINEAR);
         GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MAG_FILTER, GL11.GL_LINEAR);
         GL30.glBindFramebuffer(GL30.GL_FRAMEBUFFER, 0);
@@ -323,13 +321,13 @@ public final class OpenGLRenderer implements MeshUploader {
 
     private RenderGraph buildRenderGraph(boolean includeRayTracing) {
         RenderGraph graph = new RenderGraph()
-            .addPass(new ScenePass());
+                .addPass(new ScenePass());
         if (includeRayTracing) {
             graph.addPass(new RayTracingPass());
         }
         return graph
-            .addPass(new PostProcessPass())
-            .addPass(new ReadbackPass());
+                .addPass(new PostProcessPass())
+                .addPass(new ReadbackPass());
     }
 
     private void applyPendingShader() {
@@ -373,6 +371,7 @@ public final class OpenGLRenderer implements MeshUploader {
             if (!pipeline.shouldRender(item, mesh.snapshot())) {
                 continue;
             }
+            shaderProgram.setUniformMat4("uModel", item.transform().matrix());
             shaderProgram.setUniformVec3("uBaseColor", material.baseColor());
             shaderProgram.setUniformIntIfPresent("uBaseColorTexCoord", material.baseColorTexCoord());
             shaderProgram.setUniformIntIfPresent("uNormalTexCoord", material.normalTexCoord());
@@ -380,35 +379,30 @@ public final class OpenGLRenderer implements MeshUploader {
             shaderProgram.setUniformIntIfPresent("uAoTexCoord", material.aoTexCoord());
             shaderProgram.setUniformIntIfPresent("uEmissiveTexCoord", material.emissiveTexCoord());
             bindTextureUnit(
-                GL13.GL_TEXTURE0,
-                resourceManager.texture(material.baseColorTexture()),
-                resourceManager.sampler(material.baseColorSampler()),
-                resourceManager.defaultBaseColorTexture()
-            );
+                    GL13.GL_TEXTURE0,
+                    resourceManager.texture(material.baseColorTexture()),
+                    resourceManager.sampler(material.baseColorSampler()),
+                    resourceManager.defaultBaseColorTexture());
             bindTextureUnit(
-                GL13.GL_TEXTURE1,
-                resourceManager.texture(material.normalTexture()),
-                resourceManager.sampler(material.normalSampler()),
-                resourceManager.defaultNormalTexture()
-            );
+                    GL13.GL_TEXTURE1,
+                    resourceManager.texture(material.normalTexture()),
+                    resourceManager.sampler(material.normalSampler()),
+                    resourceManager.defaultNormalTexture());
             bindTextureUnit(
-                GL13.GL_TEXTURE2,
-                resourceManager.texture(material.metallicRoughnessTexture()),
-                resourceManager.sampler(material.metallicRoughnessSampler()),
-                resourceManager.defaultMetallicRoughnessTexture()
-            );
+                    GL13.GL_TEXTURE2,
+                    resourceManager.texture(material.metallicRoughnessTexture()),
+                    resourceManager.sampler(material.metallicRoughnessSampler()),
+                    resourceManager.defaultMetallicRoughnessTexture());
             bindTextureUnit(
-                GL13.GL_TEXTURE3,
-                resourceManager.texture(material.aoTexture()),
-                resourceManager.sampler(material.aoSampler()),
-                resourceManager.defaultAoTexture()
-            );
+                    GL13.GL_TEXTURE3,
+                    resourceManager.texture(material.aoTexture()),
+                    resourceManager.sampler(material.aoSampler()),
+                    resourceManager.defaultAoTexture());
             bindTextureUnit(
-                GL13.GL_TEXTURE4,
-                resourceManager.texture(material.emissiveTexture()),
-                resourceManager.sampler(material.emissiveSampler()),
-                resourceManager.defaultEmissiveTexture()
-            );
+                    GL13.GL_TEXTURE4,
+                    resourceManager.texture(material.emissiveTexture()),
+                    resourceManager.sampler(material.emissiveSampler()),
+                    resourceManager.defaultEmissiveTexture());
             mesh.draw();
         }
     }
@@ -460,6 +454,9 @@ public final class OpenGLRenderer implements MeshUploader {
 
     private void applyScreenSpaceUniforms() {
         ScreenSpaceSettings settings = uniforms.screenSpaceSettings();
+        postShaderProgram.setUniformInt("uSceneColor", 0);
+        postShaderProgram.setUniformInt("uSceneDepth", 1);
+        postShaderProgram.setUniformInt("uRayTraceTex", 2);
         postShaderProgram.setUniformInt("uFrameIndex", frameIndex++);
         postShaderProgram.setUniformVec2("uTexelSize", new float[] { 1.0f / renderWidth, 1.0f / renderHeight });
         postShaderProgram.setUniformInt("uEnableToneMap", settings.toneMappingEnabled() ? 1 : 0);
@@ -514,12 +511,12 @@ public final class OpenGLRenderer implements MeshUploader {
 
     private void initScreenQuad() {
         float[] quadVertices = {
-            -1.0f, -1.0f, 0.0f, 0.0f,
-            1.0f, -1.0f, 1.0f, 0.0f,
-            1.0f, 1.0f, 1.0f, 1.0f,
-            -1.0f, -1.0f, 0.0f, 0.0f,
-            1.0f, 1.0f, 1.0f, 1.0f,
-            -1.0f, 1.0f, 0.0f, 1.0f
+                -1.0f, -1.0f, 0.0f, 0.0f,
+                1.0f, -1.0f, 1.0f, 0.0f,
+                1.0f, 1.0f, 1.0f, 1.0f,
+                -1.0f, -1.0f, 0.0f, 0.0f,
+                1.0f, 1.0f, 1.0f, 1.0f,
+                -1.0f, 1.0f, 0.0f, 1.0f
         };
         screenQuadVao = GL30.glGenVertexArrays();
         screenQuadVbo = GL15.glGenBuffers();
@@ -589,7 +586,6 @@ public final class OpenGLRenderer implements MeshUploader {
         }
     }
 
-
     public <T> CompletableFuture<T> submit(Callable<T> task) {
         CompletableFuture<T> future = new CompletableFuture<>();
         Runnable wrapped = () -> {
@@ -615,7 +611,7 @@ public final class OpenGLRenderer implements MeshUploader {
     }
 
     private static float[] toVec3(Vector3f value) {
-        return new float[] {value.x(), value.y(), value.z()};
+        return new float[] { value.x(), value.y(), value.z() };
     }
 
     private void drainPendingTasks() {

@@ -32,20 +32,18 @@ public final class GpuTexture {
         byte[] rgba = textureData.rgba();
         ByteBuffer buffer = BufferUtils.createByteBuffer(rgba.length);
         buffer.put(rgba).flip();
-        int internalFormat = textureData.colorSpace() == TextureColorSpace.SRGB
-            ? GL21.GL_SRGB8_ALPHA8
-            : GL11.GL_RGBA8;
+        // Use GL_RGBA8 for all textures to avoid potential sRGB driver issues on Linux
+        int internalFormat = GL11.GL_RGBA8;
         GL11.glTexImage2D(
-            GL11.GL_TEXTURE_2D,
-            0,
-            internalFormat,
-            textureData.width(),
-            textureData.height(),
-            0,
-            GL11.GL_RGBA,
-            GL11.GL_UNSIGNED_BYTE,
-            buffer
-        );
+                GL11.GL_TEXTURE_2D,
+                0,
+                internalFormat,
+                textureData.width(),
+                textureData.height(),
+                0,
+                GL11.GL_RGBA,
+                GL11.GL_UNSIGNED_BYTE,
+                buffer);
         GL30.glGenerateMipmap(GL11.GL_TEXTURE_2D);
         return textureId;
     }

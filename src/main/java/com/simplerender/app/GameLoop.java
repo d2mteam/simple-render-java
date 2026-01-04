@@ -14,7 +14,8 @@ public final class GameLoop {
     private final OpenGLRenderer renderer;
     private final JavaFxInputAdapter inputAdapter;
 
-    public GameLoop(EngineConfig config, Time time, Scene scene, OpenGLRenderer renderer, JavaFxInputAdapter inputAdapter) {
+    public GameLoop(EngineConfig config, Time time, Scene scene, OpenGLRenderer renderer,
+            JavaFxInputAdapter inputAdapter) {
         this.config = config;
         this.time = time;
         this.scene = scene;
@@ -56,6 +57,10 @@ public final class GameLoop {
                 }
             }
             frame++;
+            if (config.maxFrames() > 0 && frame >= config.maxFrames()) {
+                logger.info("Max frames reached, stopping loop");
+                renderer.requestStop();
+            }
         }
         logger.info("Game loop completed after {} frames", frame);
     }

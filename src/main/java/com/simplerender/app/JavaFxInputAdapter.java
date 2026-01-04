@@ -5,6 +5,7 @@ import javafx.scene.Scene;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyEvent;
 import javafx.scene.input.MouseEvent;
+import javafx.application.Platform;
 import java.util.EnumSet;
 import java.util.Set;
 
@@ -25,6 +26,9 @@ public final class JavaFxInputAdapter {
         inputNode.addEventHandler(MouseEvent.MOUSE_EXITED, event -> handleMouseExit());
         inputNode.addEventHandler(MouseEvent.MOUSE_MOVED, this::handleMouseMove);
         inputNode.addEventHandler(MouseEvent.MOUSE_DRAGGED, this::handleMouseMove);
+
+        // Auto-request focus
+        Platform.runLater(inputNode::requestFocus);
     }
 
     public InputState consumeInput() {

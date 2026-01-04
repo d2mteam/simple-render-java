@@ -128,6 +128,7 @@ float computeContactShadows(vec2 uv, float depth) {
 void main() {
     vec2 uv = vTexCoord;
     vec3 color = sampleScene(uv);
+    
     float depth = texture(uSceneDepth, uv).r;
 
     if (uEnableSsao == 1) {
