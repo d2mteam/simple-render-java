@@ -8,6 +8,7 @@ import com.simplerender.asset.ShaderSourceLoader;
 import com.simplerender.asset.TextureData;
 import com.simplerender.asset.TextureDataFactory;
 import com.simplerender.asset.TextureColorSpace;
+import com.simplerender.math.Matrix4f;
 import com.simplerender.render.MaterialHandle;
 import com.simplerender.render.MeshHandle;
 import com.simplerender.render.MeshUploader;
@@ -371,7 +372,6 @@ public final class OpenGLRenderer implements MeshUploader {
             if (!pipeline.shouldRender(item, mesh.snapshot())) {
                 continue;
             }
-            shaderProgram.setUniformMat4("uModel", item.transform().matrix());
             shaderProgram.setUniformVec3("uBaseColor", material.baseColor());
             shaderProgram.setUniformIntIfPresent("uBaseColorTexCoord", material.baseColorTexCoord());
             shaderProgram.setUniformIntIfPresent("uNormalTexCoord", material.normalTexCoord());
