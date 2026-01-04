@@ -1,7 +1,6 @@
 #version 330 core
 in vec3 vNormal;
 in vec3 vTangent;
-in vec3 vBitangent;
 in vec2 vTexCoord0;
 in vec2 vTexCoord1;
 in vec3 vWorldPos;
@@ -24,6 +23,7 @@ uniform int uNormalTexCoord;
 uniform int uMetallicRoughnessTexCoord;
 uniform int uAoTexCoord;
 uniform int uEmissiveTexCoord;
+uniform vec3 uCameraPos;
 out vec4 FragColor;
 
 vec2 selectTexCoord(int index) {
@@ -81,7 +81,7 @@ void main() {
     vec2 emissiveUv = selectTexCoord(uEmissiveTexCoord);
     vec3 n = normalize(vNormal);
     vec3 t = normalize(vTangent);
-    vec3 b = normalize(vBitangent);
+    vec3 b = normalize(cross(n, t));
     mat3 tbn = mat3(t, b, n);
     vec3 normalSample = texture(uNormalTex, normalUv).rgb * 2.0 - 1.0;
     n = normalize(tbn * normalSample);
@@ -91,7 +91,7 @@ void main() {
     float ao = texture(uAoTex, aoUv).r;
     vec3 emissive = texture(uEmissiveTex, emissiveUv).rgb;
     vec3 base = uBaseColor * texture(uBaseColorTex, baseUv).rgb;
-    vec3 v = vec3(0.0, 0.0, 1.0);
+    vec3 v = normalize(uCameraPos - vWorldPos);
     vec3 color = applyLighting(n, v, base, metallic, roughness, ao, emissive);
     FragColor = vec4(color, 1.0);
 }
