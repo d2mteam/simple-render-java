@@ -166,11 +166,6 @@ public final class GltfModelImporter implements ModelImporter {
             float[] positions = dracoMesh != null
                     ? dracoMesh.positions()
                     : readFloatVec3(accessors, bufferViews, bufferBytes, positionAccessorIndex);
-            float[] normals = dracoMesh != null
-                    ? dracoMesh.normals()
-                    : (normalAccessorIndex >= 0
-                            ? readFloatVec3(accessors, bufferViews, bufferBytes, normalAccessorIndex)
-                            : defaultNormals(positions.length / 3));
             float[] texCoords0 = dracoMesh != null
                     ? dracoMesh.texCoords0()
                     : (texCoord0AccessorIndex >= 0
@@ -185,7 +180,18 @@ public final class GltfModelImporter implements ModelImporter {
                     ? dracoMesh.indices()
                     : (indexAccessorIndex >= 0
                             ? readIndices(accessors, bufferViews, bufferBytes, indexAccessorIndex)
-                            : sequentialIndices(positions.length / 3));
+                            : null);
+            if (indices == null || indices.length == 0) {
+                indices = sequentialIndices(positions.length / 3);
+            }
+            float[] normals = dracoMesh != null
+                    ? dracoMesh.normals()
+                    : (normalAccessorIndex >= 0
+                            ? readFloatVec3(accessors, bufferViews, bufferBytes, normalAccessorIndex)
+                            : null);
+            if (!hasValidNormals(normals, positions.length)) {
+                normals = computeNormals(positions, indices);
+            }
             MeshData meshData = new MeshData(positions, normals, texCoords0, texCoords1, indices);
             primitives.add(new PrimitiveMesh(meshData, materialIndex, transform));
         }
@@ -237,12 +243,12 @@ public final class GltfModelImporter implements ModelImporter {
         float[] texCoords0 = decoded.attributes().get("TEXCOORD_0");
         float[] texCoords1 = decoded.attributes().get("TEXCOORD_1");
         int vertexCount = positions != null ? positions.length / 3 : decoded.vertexCount();
-        if (normals == null) {
-            normals = defaultNormals(vertexCount);
-        }
         int[] indices = decoded.indices();
         if (indices == null || indices.length == 0) {
             indices = sequentialIndices(vertexCount);
+        }
+        if (!hasValidNormals(normals, vertexCount * 3)) {
+            normals = computeNormals(positions, indices);
         }
         return new DracoMesh(positions, normals, texCoords0, texCoords1, indices);
     }
@@ -962,6 +968,79 @@ public final class GltfModelImporter implements ModelImporter {
             normals[i * 3 + 2] = 0.0f;
         }
         return normals;
+    }
+
+    private static boolean hasValidNormals(float[] normals, int expectedLength) {
+        if (normals == null || normals.length != expectedLength) {
+            return false;
+        }
+        for (int i = 0; i < normals.length; i += 3) {
+            float nx = normals[i];
+            float ny = normals[i + 1];
+            float nz = normals[i + 2];
+            if (nx * nx + ny * ny + nz * nz > 1e-8f) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static float[] computeNormals(float[] positions, int[] indices) {
+        int vertexCount = positions.length / 3;
+        if (vertexCount == 0) {
+            return defaultNormals(0);
+        }
+        float[] normals = new float[vertexCount * 3];
+        for (int i = 0; i + 2 < indices.length; i += 3) {
+            int i0 = indices[i];
+            int i1 = indices[i + 1];
+            int i2 = indices[i + 2];
+            int p0 = i0 * 3;
+            int p1 = i1 * 3;
+            int p2 = i2 * 3;
+            if (p2 + 2 >= positions.length || p1 + 2 >= positions.length || p0 + 2 >= positions.length) {
+                continue;
+            }
+            float x1 = positions[p1] - positions[p0];
+            float y1 = positions[p1 + 1] - positions[p0 + 1];
+            float z1 = positions[p1 + 2] - positions[p0 + 2];
+            float x2 = positions[p2] - positions[p0];
+            float y2 = positions[p2 + 1] - positions[p0 + 1];
+            float z2 = positions[p2 + 2] - positions[p0 + 2];
+            float nx = y1 * z2 - z1 * y2;
+            float ny = z1 * x2 - x1 * z2;
+            float nz = x1 * y2 - y1 * x2;
+            accumulate(normals, i0, nx, ny, nz);
+            accumulate(normals, i1, nx, ny, nz);
+            accumulate(normals, i2, nx, ny, nz);
+        }
+        for (int i = 0; i < vertexCount; i++) {
+            int base = i * 3;
+            float nx = normals[base];
+            float ny = normals[base + 1];
+            float nz = normals[base + 2];
+            float len = (float) Math.sqrt(nx * nx + ny * ny + nz * nz);
+            if (len < 1e-6f) {
+                normals[base] = 0.0f;
+                normals[base + 1] = 1.0f;
+                normals[base + 2] = 0.0f;
+            } else {
+                normals[base] = nx / len;
+                normals[base + 1] = ny / len;
+                normals[base + 2] = nz / len;
+            }
+        }
+        return normals;
+    }
+
+    private static void accumulate(float[] data, int index, float x, float y, float z) {
+        int base = index * 3;
+        if (base + 2 >= data.length) {
+            return;
+        }
+        data[base] += x;
+        data[base + 1] += y;
+        data[base + 2] += z;
     }
 
     private int[] sequentialIndices(int vertexCount) {
