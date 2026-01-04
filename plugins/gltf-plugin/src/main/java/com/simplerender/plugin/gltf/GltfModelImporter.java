@@ -1,6 +1,7 @@
 package com.simplerender.plugin.gltf;
 
 import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.simplerender.asset.MaterialData;
@@ -161,22 +162,103 @@ public final class GltfModelImporter implements ModelImporter {
             int texCoord1AccessorIndex = attributes.has("TEXCOORD_1") ? attributes.get("TEXCOORD_1").getAsInt() : -1;
             int indexAccessorIndex = primitive.has("indices") ? primitive.get("indices").getAsInt() : -1;
             int materialIndex = primitive.has("material") ? primitive.get("material").getAsInt() : -1;
-            float[] positions = readFloatVec3(accessors, bufferViews, bufferBytes, positionAccessorIndex);
-            float[] normals = normalAccessorIndex >= 0
-                    ? readFloatVec3(accessors, bufferViews, bufferBytes, normalAccessorIndex)
-                    : defaultNormals(positions.length / 3);
-            float[] texCoords0 = texCoord0AccessorIndex >= 0
-                    ? readFloatVec2(accessors, bufferViews, bufferBytes, texCoord0AccessorIndex)
-                    : null;
-            float[] texCoords1 = texCoord1AccessorIndex >= 0
-                    ? readFloatVec2(accessors, bufferViews, bufferBytes, texCoord1AccessorIndex)
-                    : null;
-            int[] indices = indexAccessorIndex >= 0
-                    ? readIndices(accessors, bufferViews, bufferBytes, indexAccessorIndex)
-                    : sequentialIndices(positions.length / 3);
+            DracoMesh dracoMesh = decodeDracoPrimitive(primitive, accessors, bufferViews, bufferBytes);
+            float[] positions = dracoMesh != null
+                    ? dracoMesh.positions()
+                    : readFloatVec3(accessors, bufferViews, bufferBytes, positionAccessorIndex);
+            float[] normals = dracoMesh != null
+                    ? dracoMesh.normals()
+                    : (normalAccessorIndex >= 0
+                            ? readFloatVec3(accessors, bufferViews, bufferBytes, normalAccessorIndex)
+                            : defaultNormals(positions.length / 3));
+            float[] texCoords0 = dracoMesh != null
+                    ? dracoMesh.texCoords0()
+                    : (texCoord0AccessorIndex >= 0
+                            ? readFloatVec2(accessors, bufferViews, bufferBytes, texCoord0AccessorIndex)
+                            : null);
+            float[] texCoords1 = dracoMesh != null
+                    ? dracoMesh.texCoords1()
+                    : (texCoord1AccessorIndex >= 0
+                            ? readFloatVec2(accessors, bufferViews, bufferBytes, texCoord1AccessorIndex)
+                            : null);
+            int[] indices = dracoMesh != null
+                    ? dracoMesh.indices()
+                    : (indexAccessorIndex >= 0
+                            ? readIndices(accessors, bufferViews, bufferBytes, indexAccessorIndex)
+                            : sequentialIndices(positions.length / 3));
             MeshData meshData = new MeshData(positions, normals, texCoords0, texCoords1, indices);
             primitives.add(new PrimitiveMesh(meshData, materialIndex, transform));
         }
+    }
+
+    private DracoMesh decodeDracoPrimitive(
+            JsonObject primitive,
+            JsonArray accessors,
+            JsonArray bufferViews,
+            byte[][] bufferBytes) {
+        if (!primitive.has("extensions")) {
+            return null;
+        }
+        JsonObject extensions = primitive.getAsJsonObject("extensions");
+        if (!extensions.has("KHR_draco_mesh_compression")) {
+            return null;
+        }
+        JsonObject draco = extensions.getAsJsonObject("KHR_draco_mesh_compression");
+        int bufferViewIndex = draco.get("bufferView").getAsInt();
+        JsonObject bufferView = bufferViews.get(bufferViewIndex).getAsJsonObject();
+        byte[] compressed = readBufferViewBytes(bufferView, bufferBytes);
+        JsonObject dracoAttributes = draco.getAsJsonObject("attributes");
+
+        Map<String, DracoAttributeSpec> attributeSpecs = new HashMap<>();
+        for (Map.Entry<String, JsonElement> entry : dracoAttributes.entrySet()) {
+            String name = entry.getKey();
+            if (!primitive.getAsJsonObject("attributes").has(name)) {
+                continue;
+            }
+            int accessorIndex = primitive.getAsJsonObject("attributes").get(name).getAsInt();
+            JsonObject accessor = accessors.get(accessorIndex).getAsJsonObject();
+            int components = accessorComponentCount(accessor);
+            int count = accessor.get("count").getAsInt();
+            int dracoAttributeId = entry.getValue().getAsInt();
+            attributeSpecs.put(name, new DracoAttributeSpec(dracoAttributeId, components, count));
+        }
+
+        DracoDecoder decoder = DracoDecoder.getInstance();
+        DracoDecoder.DecodedDracoMesh decoded = decoder.decode(compressed, attributeSpecs);
+        if (decoded == null) {
+            return null;
+        }
+        float[] positions = decoded.attributes().get("POSITION");
+        if (positions == null) {
+            logger.warn("Draco primitive missing POSITION attribute");
+            return null;
+        }
+        float[] normals = decoded.attributes().get("NORMAL");
+        float[] texCoords0 = decoded.attributes().get("TEXCOORD_0");
+        float[] texCoords1 = decoded.attributes().get("TEXCOORD_1");
+        int vertexCount = positions != null ? positions.length / 3 : decoded.vertexCount();
+        if (normals == null) {
+            normals = defaultNormals(vertexCount);
+        }
+        int[] indices = decoded.indices();
+        if (indices == null || indices.length == 0) {
+            indices = sequentialIndices(vertexCount);
+        }
+        return new DracoMesh(positions, normals, texCoords0, texCoords1, indices);
+    }
+
+    private int accessorComponentCount(JsonObject accessor) {
+        String type = accessor.get("type").getAsString();
+        return switch (type) {
+            case "SCALAR" -> 1;
+            case "VEC2" -> 2;
+            case "VEC3" -> 3;
+            case "VEC4" -> 4;
+            case "MAT2" -> 4;
+            case "MAT3" -> 9;
+            case "MAT4" -> 16;
+            default -> throw new IllegalArgumentException("Unsupported accessor type: " + type);
+        };
     }
 
     private float[] readNodeTransform(JsonObject node) {
@@ -860,6 +942,18 @@ public final class GltfModelImporter implements ModelImporter {
         return bufferBytes[bufferIndex];
     }
 
+    private byte[] readBufferViewBytes(JsonObject bufferView, byte[][] bufferBytes) {
+        byte[] source = bufferBytesForView(bufferView, bufferBytes);
+        int offset = bufferView.has("byteOffset") ? bufferView.get("byteOffset").getAsInt() : 0;
+        int length = bufferView.get("byteLength").getAsInt();
+        if (offset + length > source.length) {
+            throw new IllegalArgumentException("glTF bufferView exceeds buffer length");
+        }
+        byte[] slice = new byte[length];
+        System.arraycopy(source, offset, slice, 0, length);
+        return slice;
+    }
+
     private static float[] defaultNormals(int vertexCount) {
         float[] normals = new float[vertexCount * 3];
         for (int i = 0; i < vertexCount; i++) {
@@ -882,5 +976,11 @@ public final class GltfModelImporter implements ModelImporter {
     }
 
     private record GltfAsset(JsonObject root, byte[][] buffers) {
+    }
+
+    record DracoAttributeSpec(int attributeId, int components, int count) {
+    }
+
+    private record DracoMesh(float[] positions, float[] normals, float[] texCoords0, float[] texCoords1, int[] indices) {
     }
 }

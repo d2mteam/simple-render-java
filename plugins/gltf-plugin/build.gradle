@@ -12,8 +12,9 @@ repositories {
 def lwjglVersion = "3.3.3"
 
 dependencies {
-    implementation platform("org.lwjgl:lwjgl-bom:$lwjglVersion")
-    implementation "org.lwjgl:lwjgl-assimp"
+    implementation 'org.graalvm.js:js:23.1.2'
+    implementation 'org.graalvm.js:js-scriptengine:23.1.2'
+    implementation 'org.webjars.npm:draco3d:1.5.7'
     implementation 'org.pf4j:pf4j:3.12.0'
     annotationProcessor 'org.pf4j:pf4j:3.12.0'
     implementation 'com.google.code.gson:gson:2.11.0'
