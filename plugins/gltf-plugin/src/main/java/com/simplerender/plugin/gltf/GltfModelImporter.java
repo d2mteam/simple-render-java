@@ -237,6 +237,54 @@ public final class GltfModelImporter implements ModelImporter {
         return Matrix4f.multiply(translationMatrix, rotationScale);
     }
 
+    private float[] computeNormalMatrix(float[] matrix) {
+        float a = matrix[0];
+        float b = matrix[4];
+        float c = matrix[8];
+        float d = matrix[1];
+        float e = matrix[5];
+        float f = matrix[9];
+        float g = matrix[2];
+        float h = matrix[6];
+        float i = matrix[10];
+
+        float det = a * (e * i - f * h) - b * (d * i - f * g) + c * (d * h - e * g);
+        if (Math.abs(det) < 1e-8f) {
+            return new float[] {
+                1.0f, 0.0f, 0.0f,
+                0.0f, 1.0f, 0.0f,
+                0.0f, 0.0f, 1.0f
+            };
+        }
+
+        float invDet = 1.0f / det;
+        float inv00 = (e * i - f * h) * invDet;
+        float inv01 = (c * h - b * i) * invDet;
+        float inv02 = (b * f - c * e) * invDet;
+        float inv10 = (f * g - d * i) * invDet;
+        float inv11 = (a * i - c * g) * invDet;
+        float inv12 = (c * d - a * f) * invDet;
+        float inv20 = (d * h - e * g) * invDet;
+        float inv21 = (b * g - a * h) * invDet;
+        float inv22 = (a * e - b * d) * invDet;
+
+        float t00 = inv00;
+        float t01 = inv10;
+        float t02 = inv20;
+        float t10 = inv01;
+        float t11 = inv11;
+        float t12 = inv21;
+        float t20 = inv02;
+        float t21 = inv12;
+        float t22 = inv22;
+
+        return new float[] {
+            t00, t10, t20,
+            t01, t11, t21,
+            t02, t12, t22
+        };
+    }
+
     private GltfAsset loadAsset(Path path) throws Exception {
         if (path.toString().toLowerCase().endsWith(".glb")) {
             return loadGlb(path);
