@@ -187,6 +187,26 @@ final class GpuResourceManager {
         return textures.get(defaultBaseColorTexture);
     }
 
+    public GpuTexture defaultBaseColorTexture() {
+        return textures.get(defaultBaseColorTexture);
+    }
+
+    public GpuTexture defaultNormalTexture() {
+        return textures.get(defaultNormalTexture);
+    }
+
+    public GpuTexture defaultMetallicRoughnessTexture() {
+        return textures.get(defaultMetallicRoughnessTexture);
+    }
+
+    public GpuTexture defaultAoTexture() {
+        return textures.get(defaultAoTexture);
+    }
+
+    public GpuTexture defaultEmissiveTexture() {
+        return textures.get(defaultEmissiveTexture);
+    }
+
     public GpuSampler defaultSampler() {
         return samplers.get(defaultSampler);
     }
