@@ -373,7 +373,6 @@ public final class OpenGLRenderer implements MeshUploader {
             if (!pipeline.shouldRender(item, mesh.snapshot())) {
                 continue;
             }
-            shaderProgram.setUniformMat4("uModel", item.transform().matrix());
             shaderProgram.setUniformVec3("uBaseColor", material.baseColor());
             shaderProgram.setUniformIntIfPresent("uBaseColorTexCoord", material.baseColorTexCoord());
             shaderProgram.setUniformIntIfPresent("uNormalTexCoord", material.normalTexCoord());
