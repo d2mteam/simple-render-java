@@ -98,7 +98,7 @@ public final class Scene {
             items.add(new RenderItem(
                 meshUploader.uploadMesh(primitive.meshData()),
                 meshUploader.uploadMaterial(primitive.materialData()),
-                new Transform()
+                new Transform(primitive.transform())
             ));
         }
         return items;

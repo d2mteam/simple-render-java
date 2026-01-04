@@ -4,6 +4,7 @@ import com.simplerender.asset.MaterialData;
 import com.simplerender.asset.MeshData;
 import com.simplerender.asset.TextureData;
 import com.simplerender.asset.plugin.ModelImporter;
+import com.simplerender.math.Matrix4f;
 import org.pf4j.Extension;
 
 import javax.imageio.ImageIO;
@@ -30,7 +31,7 @@ public final class ObjModelImporter implements ModelImporter {
         int[] indices = objData.indices();
         MeshData meshData = new MeshData(positions, normals, texCoords, indices);
         MaterialData materialData = buildMaterial(path, objData.materialLibrary(), objData.materialName());
-        return new ImportedModel(List.of(new ImportedPrimitive(meshData, materialData)));
+        return new ImportedModel(List.of(new ImportedPrimitive(meshData, materialData, Matrix4f.identity())));
     }
 
     private ObjData parseObj(Path path) {

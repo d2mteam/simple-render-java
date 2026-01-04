@@ -3,10 +3,19 @@ package com.simplerender.render;
 import com.simplerender.math.Vector3f;
 
 public final class Transform {
+    private final float[] baseMatrix;
     private float x;
     private float y;
     private float z;
     private float scale = 1.0f;
+
+    public Transform() {
+        this.baseMatrix = null;
+    }
+
+    public Transform(float[] baseMatrix) {
+        this.baseMatrix = baseMatrix == null ? null : java.util.Arrays.copyOf(baseMatrix, baseMatrix.length);
+    }
 
     public synchronized void setPosition(float x, float y, float z) {
         this.x = x;
@@ -27,14 +36,17 @@ public final class Transform {
     }
 
     public synchronized float[] matrix() {
-        float[] matrix = new float[16];
-        matrix[0] = scale;
-        matrix[5] = scale;
-        matrix[10] = scale;
-        matrix[12] = x;
-        matrix[13] = y;
-        matrix[14] = z;
-        matrix[15] = 1.0f;
-        return matrix;
+        float[] local = new float[16];
+        local[0] = scale;
+        local[5] = scale;
+        local[10] = scale;
+        local[12] = x;
+        local[13] = y;
+        local[14] = z;
+        local[15] = 1.0f;
+        if (baseMatrix == null) {
+            return local;
+        }
+        return com.simplerender.math.Matrix4f.multiply(baseMatrix, local);
     }
 }

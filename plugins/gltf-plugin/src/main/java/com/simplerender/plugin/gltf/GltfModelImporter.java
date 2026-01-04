@@ -50,15 +50,17 @@ public final class GltfModelImporter implements ModelImporter {
             List<ImportedPrimitive> importedPrimitives = new ArrayList<>();
             if (!primitives.isEmpty()) {
                 Map<Integer, MaterialData> materialCache = new HashMap<>();
+                Map<TextureCacheKey, TextureData> textureCache = new HashMap<>();
                 for (PrimitiveMesh primitive : primitives) {
                     MaterialData material = loadMaterialByIndex(
                         primitive.materialIndex(),
                         root,
                         bufferBytes,
                         path.getParent(),
-                        materialCache
+                        materialCache,
+                        textureCache
                     );
-                    importedPrimitives.add(new ImportedPrimitive(primitive.meshData(), material));
+                    importedPrimitives.add(new ImportedPrimitive(primitive.meshData(), material, primitive.transform()));
                 }
             }
             return new ImportedModel(importedPrimitives);
@@ -161,12 +163,11 @@ public final class GltfModelImporter implements ModelImporter {
             float[] texCoords1 = texCoord1AccessorIndex >= 0
                 ? readFloatVec2(accessors, bufferViews, bufferBytes, texCoord1AccessorIndex)
                 : null;
-            applyTransform(positions, normals, transform);
             int[] indices = indexAccessorIndex >= 0
                 ? readIndices(accessors, bufferViews, bufferBytes, indexAccessorIndex)
                 : sequentialIndices(positions.length / 3);
             MeshData meshData = new MeshData(positions, normals, texCoords0, texCoords1, indices);
-            primitives.add(new PrimitiveMesh(meshData, materialIndex));
+            primitives.add(new PrimitiveMesh(meshData, materialIndex, transform));
         }
     }
 
@@ -212,53 +213,28 @@ public final class GltfModelImporter implements ModelImporter {
         float wy = w * y;
         float wz = w * z;
 
-        float[] matrix = new float[16];
-        matrix[0] = (1.0f - 2.0f * (yy + zz)) * scale[0];
-        matrix[1] = (2.0f * (xy + wz)) * scale[0];
-        matrix[2] = (2.0f * (xz - wy)) * scale[0];
-        matrix[4] = (2.0f * (xy - wz)) * scale[1];
-        matrix[5] = (1.0f - 2.0f * (xx + zz)) * scale[1];
-        matrix[6] = (2.0f * (yz + wx)) * scale[1];
-        matrix[8] = (2.0f * (xz + wy)) * scale[2];
-        matrix[9] = (2.0f * (yz - wx)) * scale[2];
-        matrix[10] = (1.0f - 2.0f * (xx + yy)) * scale[2];
-        matrix[12] = translation[0];
-        matrix[13] = translation[1];
-        matrix[14] = translation[2];
-        matrix[15] = 1.0f;
-        return matrix;
-    }
+        float[] rotationMatrix = Matrix4f.identity();
+        rotationMatrix[0] = 1.0f - 2.0f * (yy + zz);
+        rotationMatrix[1] = 2.0f * (xy + wz);
+        rotationMatrix[2] = 2.0f * (xz - wy);
+        rotationMatrix[4] = 2.0f * (xy - wz);
+        rotationMatrix[5] = 1.0f - 2.0f * (xx + zz);
+        rotationMatrix[6] = 2.0f * (yz + wx);
+        rotationMatrix[8] = 2.0f * (xz + wy);
+        rotationMatrix[9] = 2.0f * (yz - wx);
+        rotationMatrix[10] = 1.0f - 2.0f * (xx + yy);
 
-    private void applyTransform(float[] positions, float[] normals, float[] matrix) {
-        for (int i = 0; i < positions.length; i += 3) {
-            float x = positions[i];
-            float y = positions[i + 1];
-            float z = positions[i + 2];
-            positions[i] = matrix[0] * x + matrix[4] * y + matrix[8] * z + matrix[12];
-            positions[i + 1] = matrix[1] * x + matrix[5] * y + matrix[9] * z + matrix[13];
-            positions[i + 2] = matrix[2] * x + matrix[6] * y + matrix[10] * z + matrix[14];
-        }
-        if (normals == null) {
-            return;
-        }
-        for (int i = 0; i < normals.length; i += 3) {
-            float x = normals[i];
-            float y = normals[i + 1];
-            float z = normals[i + 2];
-            float nx = matrix[0] * x + matrix[4] * y + matrix[8] * z;
-            float ny = matrix[1] * x + matrix[5] * y + matrix[9] * z;
-            float nz = matrix[2] * x + matrix[6] * y + matrix[10] * z;
-            float length = (float) Math.sqrt(nx * nx + ny * ny + nz * nz);
-            if (length == 0.0f) {
-                normals[i] = 0.0f;
-                normals[i + 1] = 1.0f;
-                normals[i + 2] = 0.0f;
-            } else {
-                normals[i] = nx / length;
-                normals[i + 1] = ny / length;
-                normals[i + 2] = nz / length;
-            }
-        }
+        float[] scaleMatrix = Matrix4f.identity();
+        scaleMatrix[0] = scale[0];
+        scaleMatrix[5] = scale[1];
+        scaleMatrix[10] = scale[2];
+
+        float[] rotationScale = Matrix4f.multiply(rotationMatrix, scaleMatrix);
+        float[] translationMatrix = Matrix4f.identity();
+        translationMatrix[12] = translation[0];
+        translationMatrix[13] = translation[1];
+        translationMatrix[14] = translation[2];
+        return Matrix4f.multiply(translationMatrix, rotationScale);
     }
 
     private GltfAsset loadAsset(Path path) throws Exception {
@@ -335,7 +311,8 @@ public final class GltfModelImporter implements ModelImporter {
         JsonObject root,
         byte[][] bufferBytes,
         Path baseDir,
-        Map<Integer, MaterialData> materialCache
+        Map<Integer, MaterialData> materialCache,
+        Map<TextureCacheKey, TextureData> textureCache
     ) {
         if (materialIndex >= 0 && materialCache.containsKey(materialIndex)) {
             return materialCache.get(materialIndex);
@@ -370,7 +347,8 @@ public final class GltfModelImporter implements ModelImporter {
                     TextureColorSpace.SRGB,
                     root,
                     bufferBytes,
-                    baseDir
+                    baseDir,
+                    textureCache
                 );
             }
             if (pbr.has("metallicRoughnessTexture")) {
@@ -383,7 +361,8 @@ public final class GltfModelImporter implements ModelImporter {
                     TextureColorSpace.LINEAR,
                     root,
                     bufferBytes,
-                    baseDir
+                    baseDir,
+                    textureCache
                 );
             }
         }
@@ -397,7 +376,8 @@ public final class GltfModelImporter implements ModelImporter {
                 TextureColorSpace.LINEAR,
                 root,
                 bufferBytes,
-                baseDir
+                baseDir,
+                textureCache
             );
         }
         if (material.has("occlusionTexture")) {
@@ -410,7 +390,8 @@ public final class GltfModelImporter implements ModelImporter {
                 TextureColorSpace.LINEAR,
                 root,
                 bufferBytes,
-                baseDir
+                baseDir,
+                textureCache
             );
         }
         if (material.has("emissiveTexture")) {
@@ -423,7 +404,8 @@ public final class GltfModelImporter implements ModelImporter {
                 TextureColorSpace.SRGB,
                 root,
                 bufferBytes,
-                baseDir
+                baseDir,
+                textureCache
             );
         }
         MaterialData materialData = new MaterialData(
@@ -455,7 +437,8 @@ public final class GltfModelImporter implements ModelImporter {
         TextureColorSpace colorSpace,
         JsonObject root,
         byte[][] bufferBytes,
-        Path baseDir
+        Path baseDir,
+        Map<TextureCacheKey, TextureData> textureCache
     ) {
         if (!root.has("textures") || !root.has("images")) {
             logger.warn("glTF texture referenced but textures/images arrays are missing");
@@ -472,6 +455,10 @@ public final class GltfModelImporter implements ModelImporter {
             int samplerIndex = texture.get("sampler").getAsInt();
             samplerData = loadSamplerByIndex(samplerIndex, root);
         }
+        TextureCacheKey cacheKey = new TextureCacheKey(sourceIndex, colorSpace);
+        if (textureCache.containsKey(cacheKey)) {
+            return new TextureSlot(textureCache.get(cacheKey), samplerData, texCoord);
+        }
         JsonObject image = root.getAsJsonArray("images").get(sourceIndex).getAsJsonObject();
         try {
             byte[] imageBytes = readImageBytes(image, root, bufferBytes, baseDir);
@@ -484,10 +471,41 @@ public final class GltfModelImporter implements ModelImporter {
                 return null;
             }
             logger.info("Loaded glTF texture image {}", sourceIndex);
-            return new TextureSlot(buildTextureData(bufferedImage, colorSpace), samplerData, texCoord);
+            TextureData textureData = buildTextureData(bufferedImage, colorSpace);
+            textureCache.put(cacheKey, textureData);
+            return new TextureSlot(textureData, samplerData, texCoord);
         } catch (Exception e) {
             logger.warn("Failed to load glTF texture image {}", sourceIndex, e);
             return null;
+        }
+    }
+
+    private static final class TextureCacheKey {
+        private final int imageIndex;
+        private final TextureColorSpace colorSpace;
+
+        private TextureCacheKey(int imageIndex, TextureColorSpace colorSpace) {
+            this.imageIndex = imageIndex;
+            this.colorSpace = colorSpace;
+        }
+
+        @Override
+        public boolean equals(Object obj) {
+            if (this == obj) {
+                return true;
+            }
+            if (obj == null || getClass() != obj.getClass()) {
+                return false;
+            }
+            TextureCacheKey other = (TextureCacheKey) obj;
+            return imageIndex == other.imageIndex && colorSpace == other.colorSpace;
+        }
+
+        @Override
+        public int hashCode() {
+            int result = Integer.hashCode(imageIndex);
+            result = 31 * result + colorSpace.hashCode();
+            return result;
         }
     }
 
@@ -679,7 +697,7 @@ public final class GltfModelImporter implements ModelImporter {
         return indices;
     }
 
-    private record PrimitiveMesh(MeshData meshData, int materialIndex) {
+    private record PrimitiveMesh(MeshData meshData, int materialIndex, float[] transform) {
     }
 
     private record GltfAsset(JsonObject root, byte[][] buffers) {
