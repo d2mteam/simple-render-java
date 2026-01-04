@@ -356,6 +356,7 @@ public final class OpenGLRenderer implements MeshUploader {
         uniforms.updateView(snapshot.camera().position(), snapshot.camera().forward(), snapshot.camera().up());
         shaderProgram.setUniformMat4("uProjection", uniforms.projectionMatrix());
         shaderProgram.setUniformMat4("uView", uniforms.viewMatrix());
+        shaderProgram.setUniformVec3("uCameraPos", snapshot.camera().position());
         applyLightUniforms();
         pipeline.updateFrustum(uniforms.projectionMatrix(), uniforms.viewMatrix());
         RenderItem[] renderItems = snapshot.renderItems();
@@ -380,27 +381,32 @@ public final class OpenGLRenderer implements MeshUploader {
             bindTextureUnit(
                 GL13.GL_TEXTURE0,
                 resourceManager.texture(material.baseColorTexture()),
-                resourceManager.sampler(material.baseColorSampler())
+                resourceManager.sampler(material.baseColorSampler()),
+                resourceManager.defaultBaseColorTexture()
             );
             bindTextureUnit(
                 GL13.GL_TEXTURE1,
                 resourceManager.texture(material.normalTexture()),
-                resourceManager.sampler(material.normalSampler())
+                resourceManager.sampler(material.normalSampler()),
+                resourceManager.defaultNormalTexture()
             );
             bindTextureUnit(
                 GL13.GL_TEXTURE2,
                 resourceManager.texture(material.metallicRoughnessTexture()),
-                resourceManager.sampler(material.metallicRoughnessSampler())
+                resourceManager.sampler(material.metallicRoughnessSampler()),
+                resourceManager.defaultMetallicRoughnessTexture()
             );
             bindTextureUnit(
                 GL13.GL_TEXTURE3,
                 resourceManager.texture(material.aoTexture()),
-                resourceManager.sampler(material.aoSampler())
+                resourceManager.sampler(material.aoSampler()),
+                resourceManager.defaultAoTexture()
             );
             bindTextureUnit(
                 GL13.GL_TEXTURE4,
                 resourceManager.texture(material.emissiveTexture()),
-                resourceManager.sampler(material.emissiveSampler())
+                resourceManager.sampler(material.emissiveSampler()),
+                resourceManager.defaultEmissiveTexture()
             );
             mesh.draw();
         }
@@ -536,8 +542,8 @@ public final class OpenGLRenderer implements MeshUploader {
         shaderProgram.setUniformIntIfPresent("uEmissiveTex", 4);
     }
 
-    private void bindTextureUnit(int textureUnit, GpuTexture texture, GpuSampler sampler) {
-        GpuTexture resolved = texture != null ? texture : resourceManager.defaultTexture();
+    private void bindTextureUnit(int textureUnit, GpuTexture texture, GpuSampler sampler, GpuTexture fallback) {
+        GpuTexture resolved = texture != null ? texture : fallback;
         if (resolved == null) {
             return;
         }
