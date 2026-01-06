@@ -30,7 +30,7 @@ public final class CameraController {
             camera.forward().setZ(fz / fLen);
         }
 
-        float speed = 10.0f * time.deltaSeconds();
+        float speed = camera.moveSpeed() * time.deltaSeconds();
         float moveX = 0.0f;
         float moveY = 0.0f;
         float moveZ = 0.0f;

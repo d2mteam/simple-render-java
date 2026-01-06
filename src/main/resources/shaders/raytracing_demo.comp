@@ -75,6 +75,19 @@ bool traceScene(Ray ray, out Hit hit) {
             hitSomething = true;
         }
     }
+
+    // Dynamic Debug Sphere
+    float orbitRadius = 2.5;
+    float orbitSpeed = 1.0;
+    vec3 orbitPos = vec3(sin(uTime * orbitSpeed) * orbitRadius, 1.0, cos(uTime * orbitSpeed) * orbitRadius);
+    Hit debugSphereHit;
+    if (intersectSphere(ray, orbitPos, 0.6, debugSphereHit)) {
+        if (debugSphereHit.t < hit.t) {
+            hit = debugSphereHit;
+            hit.materialId = 0;
+            hitSomething = true;
+        }
+    }
     return hitSomething;
 }
 

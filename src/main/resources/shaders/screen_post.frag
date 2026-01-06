@@ -175,5 +175,7 @@ void main() {
         color += vec3(0.0) * uSsgiStrength;
     }
 
+    // Final Gamma Correction (Linear -> sRGB)
+    color = pow(color, vec3(1.0 / 2.2));
     FragColor = vec4(color, 1.0);
 }

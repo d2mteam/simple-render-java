@@ -212,7 +212,7 @@ public final class OpenGLRenderer implements MeshUploader {
         GL11.glClearColor(0.12f, 0.12f, 0.12f, 1.0f);
         uniforms = new RenderUniforms(1.0f);
         resourceManager.initDefaultTextures(
-                TextureDataFactory.solidColor(255, 255, 255, 255, TextureColorSpace.SRGB),
+                TextureDataFactory.checkerboard(512, 64, TextureColorSpace.SRGB),
                 TextureDataFactory.solidColor(128, 128, 255, 255),
                 TextureDataFactory.solidColor(0, 255, 0, 255),
                 TextureDataFactory.solidColor(255, 255, 255, 255),
@@ -378,6 +378,22 @@ public final class OpenGLRenderer implements MeshUploader {
             shaderProgram.setUniformIntIfPresent("uMetallicRoughnessTexCoord", material.metallicRoughnessTexCoord());
             shaderProgram.setUniformIntIfPresent("uAoTexCoord", material.aoTexCoord());
             shaderProgram.setUniformIntIfPresent("uEmissiveTexCoord", material.emissiveTexCoord());
+
+            // Alpha Handling
+            String mode = material.alphaMode();
+            int modeInt = "MASK".equals(mode) ? 1 : ("BLEND".equals(mode) ? 2 : 0);
+            shaderProgram.setUniformIntIfPresent("uAlphaMode", modeInt);
+            shaderProgram.setUniformFloatIfPresent("uAlphaCutoff", material.alphaCutoff());
+
+            if (modeInt == 2) { // BLEND
+                GL11.glEnable(GL11.GL_BLEND);
+                GL11.glBlendFunc(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA);
+                GL11.glDepthMask(false); // Disable depth write for transparent
+            } else {
+                GL11.glDisable(GL11.GL_BLEND);
+                GL11.glDepthMask(true);
+            }
+
             bindTextureUnit(
                     GL13.GL_TEXTURE0,
                     resourceManager.texture(material.baseColorTexture()),

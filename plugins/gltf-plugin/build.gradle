@@ -9,8 +9,6 @@ repositories {
     mavenCentral()
 }
 
-def lwjglVersion = "3.3.3"
-
 dependencies {
     implementation 'org.graalvm.js:js:24.2.1'
     implementation 'org.graalvm.js:js-scriptengine:24.2.1'
@@ -31,4 +29,9 @@ jar {
         )
     }
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+}
+
+task copyDebugLibs(type: Copy) {
+    from configurations.runtimeClasspath
+    into 'build/debug-libs'
 }

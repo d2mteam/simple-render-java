@@ -23,6 +23,8 @@ uniform int uNormalTexCoord;
 uniform int uMetallicRoughnessTexCoord;
 uniform int uAoTexCoord;
 uniform int uEmissiveTexCoord;
+uniform int uAlphaMode; // 0=OPAQUE, 1=MASK, 2=BLEND
+uniform float uAlphaCutoff;
 uniform vec3 uCameraPos;
 out vec4 FragColor;
 
@@ -90,8 +92,16 @@ void main() {
     float roughness = metallicRoughness.g;
     float ao = texture(uAoTex, aoUv).r;
     vec3 emissive = texture(uEmissiveTex, emissiveUv).rgb;
-    vec3 base = uBaseColor * texture(uBaseColorTex, baseUv).rgb;
+    vec3 baseSample = texture(uBaseColorTex, baseUv).rgb;
+    float alphaSample = texture(uBaseColorTex, baseUv).a;
+    vec3 base = uBaseColor * baseSample;
+    
     vec3 v = normalize(uCameraPos - vWorldPos);
     vec3 color = applyLighting(n, v, base, metallic, roughness, ao, emissive);
-    FragColor = vec4(color, 1.0);
+    
+    // Gamma correction
+    color = color / (color + vec3(1.0));
+    color = pow(color, vec3(1.0 / 2.2));
+    
+    FragColor = vec4(color, alphaSample);
 }

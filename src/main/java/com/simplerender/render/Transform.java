@@ -47,6 +47,10 @@ public final class Transform {
         if (baseMatrix == null) {
             return local;
         }
-        return com.simplerender.math.Matrix4f.multiply(baseMatrix, local);
+        // Apply local (User) transform as PARENT of the base (GLTF) transform.
+        // This ensures scaling the "Model" scales the whole hierarchy around the world
+        // origin,
+        // rather than scaling individual parts in place.
+        return com.simplerender.math.Matrix4f.multiply(local, baseMatrix);
     }
 }

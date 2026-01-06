@@ -106,12 +106,11 @@ public final class RenderControlPanel {
                                 float y = Float.parseFloat(posY.getText());
                                 float z = Float.parseFloat(posZ.getText());
                                 float s = Float.parseFloat(scale.getText());
-                                int index = objectList.getSelectionModel().getSelectedIndex();
-                                if (index < 0) {
-                                        logger.warn("No object selected for transform");
-                                        return;
+                                // Apply to ALL objects to treat the scene as a single model
+                                for (int i = 0; i < scene.objectCount(); i++) {
+                                        scene.updateTransform(i, x, y, z, s);
                                 }
-                                scene.updateTransform(index, x, y, z, s);
+                                logger.info("Applied transform to {} objects", scene.objectCount());
                         } catch (NumberFormatException e) {
                                 logger.warn("Invalid transform input", e);
                         }
@@ -326,8 +325,14 @@ public final class RenderControlPanel {
 
                 VBox postControls = new VBox(8, postToggles, postGrid);
 
+                Slider cameraSpeed = createSlider(0.01, 5.0, scene.camera().moveSpeed());
+                cameraSpeed.valueProperty()
+                                .addListener((obs, oldVal, newVal) -> scene.camera().setMoveSpeed(newVal.floatValue()));
+
                 VBox controls = new VBox(10);
                 controls.getChildren().addAll(
+                                new Label("Camera Speed"),
+                                cameraSpeed,
                                 new Label("Objects"),
                                 objectList,
                                 loadObject,

@@ -23,12 +23,33 @@ public final class MeshData {
     }
 
     public MeshData(
-        float[] positions,
-        float[] normals,
-        float[] texCoords0,
-        float[] texCoords1,
-        int[] indices
-    ) {
+            float[] positions,
+            float[] normals,
+            float[] tangents,
+            float[] bitangents,
+            float[] texCoords0,
+            float[] texCoords1,
+            int[] indices) {
+        this.positions = Arrays.copyOf(positions, positions.length);
+        this.normals = Arrays.copyOf(normals, normals.length);
+        this.tangents = Arrays.copyOf(tangents, tangents.length);
+        this.bitangents = Arrays.copyOf(bitangents, bitangents.length);
+        int vertexCount = this.positions.length / 3;
+        this.texCoords0 = buildTexCoords(texCoords0, vertexCount, null);
+        this.texCoords1 = buildTexCoords(texCoords1, vertexCount, this.texCoords0);
+        this.indices = Arrays.copyOf(indices, indices.length);
+
+        Vector3f center = computeBoundsCenter(this.positions);
+        this.boundsCenter = center;
+        this.boundsRadius = computeBoundsRadius(this.positions, center);
+    }
+
+    public MeshData(
+            float[] positions,
+            float[] normals,
+            float[] texCoords0,
+            float[] texCoords1,
+            int[] indices) {
         this.positions = Arrays.copyOf(positions, positions.length);
         this.normals = Arrays.copyOf(normals, normals.length);
         int vertexCount = this.positions.length / 3;
@@ -36,11 +57,10 @@ public final class MeshData {
         this.texCoords1 = buildTexCoords(texCoords1, vertexCount, this.texCoords0);
         this.indices = Arrays.copyOf(indices, indices.length);
         float[][] tb = buildTangents(
-            this.positions,
-            this.normals,
-            this.texCoords0,
-            this.indices
-        );
+                this.positions,
+                this.normals,
+                this.texCoords0,
+                this.indices);
         this.tangents = tb[0];
         this.bitangents = tb[1];
         Vector3f center = computeBoundsCenter(this.positions);
@@ -126,10 +146,9 @@ public final class MeshData {
             }
         }
         return new Vector3f(
-            (minX + maxX) * 0.5f,
-            (minY + maxY) * 0.5f,
-            (minZ + maxZ) * 0.5f
-        );
+                (minX + maxX) * 0.5f,
+                (minY + maxY) * 0.5f,
+                (minZ + maxZ) * 0.5f);
     }
 
     private static float computeBoundsRadius(float[] positions, Vector3f center) {
@@ -172,7 +191,7 @@ public final class MeshData {
         float[] bitangents = new float[vertexCount * 3];
         if (indices.length < 3 || texCoords.length != vertexCount * 2) {
             fillFallbackTangents(normals, tangents, bitangents);
-            return new float[][] {tangents, bitangents};
+            return new float[][] { tangents, bitangents };
         }
         for (int i = 0; i < indices.length; i += 3) {
             int i0 = indices[i];
@@ -256,7 +275,7 @@ public final class MeshData {
             bitangents[base + 1] = by;
             bitangents[base + 2] = bz;
         }
-        return new float[][] {tangents, bitangents};
+        return new float[][] { tangents, bitangents };
     }
 
     private static void accumulate(float[] data, int index, float x, float y, float z) {
@@ -305,26 +324,25 @@ public final class MeshData {
         float tz = nx * uy - ny * ux;
         float len = (float) Math.sqrt(tx * tx + ty * ty + tz * tz);
         if (len < 1e-6f) {
-            return new float[] {1.0f, 0.0f, 0.0f};
+            return new float[] { 1.0f, 0.0f, 0.0f };
         }
-        return new float[] {tx / len, ty / len, tz / len};
+        return new float[] { tx / len, ty / len, tz / len };
     }
 
     private static float[] orthonormalBitangent(
-        float nx,
-        float ny,
-        float nz,
-        float tx,
-        float ty,
-        float tz
-    ) {
+            float nx,
+            float ny,
+            float nz,
+            float tx,
+            float ty,
+            float tz) {
         float bx = ny * tz - nz * ty;
         float by = nz * tx - nx * tz;
         float bz = nx * ty - ny * tx;
         float len = (float) Math.sqrt(bx * bx + by * by + bz * bz);
         if (len < 1e-6f) {
-            return new float[] {0.0f, 1.0f, 0.0f};
+            return new float[] { 0.0f, 1.0f, 0.0f };
         }
-        return new float[] {bx / len, by / len, bz / len};
+        return new float[] { bx / len, by / len, bz / len };
     }
 }

@@ -30,6 +30,10 @@ public final class Scene {
         this.renderItems = renderItems;
     }
 
+    public Camera camera() {
+        return camera;
+    }
+
     public static Scene bootstrap(MeshUploader meshUploader, Optional<ModelImporter.ImportedModel> importedModel) {
         Camera camera = new Camera();
         CameraController cameraController = new CameraController();
@@ -95,7 +99,8 @@ public final class Scene {
         List<RenderItem> items = new ArrayList<>();
         for (ModelImporter.ImportedPrimitive primitive : model.primitives()) {
             Transform t = new Transform(primitive.transform());
-            t.setScale(0.1f); // Default scale down for large models
+            // t.setScale(0.1f); // REMOVED: This causes exploded view (scales mesh but not
+            // position)
             items.add(new RenderItem(
                     meshUploader.uploadMesh(primitive.meshData()),
                     meshUploader.uploadMaterial(primitive.materialData()),
