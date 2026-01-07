@@ -1,5 +1,8 @@
 package com.simplerender.app;
 
+/**
+ * Immutable input snapshot for a single frame.
+ */
 public final class InputState {
     private static final InputState IDLE = new InputState(
         false,

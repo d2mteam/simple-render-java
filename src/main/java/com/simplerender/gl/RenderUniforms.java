@@ -3,6 +3,11 @@ package com.simplerender.gl;
 import com.simplerender.math.Matrix4f;
 import com.simplerender.math.Vector3f;
 
+/**
+ * Container for per-frame uniform data such as camera matrices and lights.
+ *
+ * <p>Owned by the renderer and updated from the scene camera each frame.
+ */
 final class RenderUniforms {
     static final int MAX_LIGHTS = 8;
     static final int LIGHT_DIRECTIONAL = 0;
@@ -81,6 +86,9 @@ final class RenderUniforms {
         lightCount = 3;
     }
 
+    /**
+     * Simple light description stored in uniform arrays.
+     */
     static final class Light {
         private final int type;
         private final float[] color;

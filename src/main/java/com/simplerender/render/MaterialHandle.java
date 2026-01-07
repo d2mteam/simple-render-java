@@ -2,6 +2,9 @@ package com.simplerender.render;
 
 import java.util.Objects;
 
+/**
+ * Stable identifier for a GPU material binding.
+ */
 public final class MaterialHandle {
     private final int id;
 

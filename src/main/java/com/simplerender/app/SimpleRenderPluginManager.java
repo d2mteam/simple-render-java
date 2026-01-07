@@ -8,6 +8,9 @@ import org.pf4j.RuntimeMode;
 
 import java.nio.file.Path;
 
+/**
+ * PF4J plugin manager configured for Simple Render development.
+ */
 public final class SimpleRenderPluginManager extends DefaultPluginManager {
     public SimpleRenderPluginManager(Path pluginsRoot) {
         super(pluginsRoot);

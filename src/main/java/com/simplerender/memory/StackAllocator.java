@@ -3,6 +3,9 @@ package com.simplerender.memory;
 import java.util.ArrayDeque;
 import java.util.Deque;
 
+/**
+ * LIFO stack allocator with marker-based deallocation.
+ */
 public final class StackAllocator implements Allocator {
     private final byte[] buffer;
     private int offset;

@@ -1,5 +1,8 @@
 package com.simplerender.memory;
 
+/**
+ * Linear arena allocator that resets in bulk.
+ */
 public final class LinearArenaAllocator implements Allocator {
     private final byte[] buffer;
     private int offset;

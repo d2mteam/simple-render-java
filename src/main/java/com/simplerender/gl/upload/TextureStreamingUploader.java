@@ -10,6 +10,9 @@ import org.lwjgl.opengl.GL12;
 import org.lwjgl.opengl.GL21;
 import org.lwjgl.opengl.GL30;
 
+/**
+ * Uploads textures using a ring of pixel buffer objects for streaming.
+ */
 public final class TextureStreamingUploader {
     private final int[] pboRing;
     private int ringIndex;

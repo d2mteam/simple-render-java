@@ -3,6 +3,12 @@ package com.simplerender.gl.upload;
 import java.util.Queue;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
+/**
+ * Thread-safe queue for batching GPU upload work between frames.
+ *
+ * <p>Producers enqueue {@link UploadTask} instances, and the render thread
+ * drains the queue before drawing.
+ */
 public final class UploadQueue {
     private final Queue<UploadTask> tasks = new ConcurrentLinkedQueue<>();
     private final StaticMeshUploader staticMeshUploader;

@@ -5,6 +5,11 @@ import java.util.Deque;
 import java.util.HashMap;
 import java.util.Map;
 
+/**
+ * Buddy allocator backed by a power-of-two byte buffer.
+ *
+ * <p>Splits and merges blocks in power-of-two sizes to reduce fragmentation.
+ */
 public final class BuddyAllocator implements Allocator {
     private final byte[] buffer;
     private final int maxOrder;

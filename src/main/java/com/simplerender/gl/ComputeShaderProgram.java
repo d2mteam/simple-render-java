@@ -5,6 +5,11 @@ import org.lwjgl.opengl.GL43;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * Wrapper for compiling, linking, and executing compute shaders.
+ *
+ * <p>Provides convenience methods for binding and setting common uniforms.
+ */
 final class ComputeShaderProgram {
     private static final Logger logger = LoggerFactory.getLogger(ComputeShaderProgram.class);
 

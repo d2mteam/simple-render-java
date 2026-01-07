@@ -1,5 +1,8 @@
 package com.simplerender.render;
 
+/**
+ * Stable identifier for a GPU sampler resource.
+ */
 public final class SamplerHandle {
     private final int id;
 

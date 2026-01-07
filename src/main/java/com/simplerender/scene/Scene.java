@@ -14,6 +14,13 @@ import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * Runtime scene container that owns the active camera and renderable items.
+ *
+ * <p>The scene is responsible for bootstrapping imported models, updating camera
+ * motion in response to input, and producing immutable {@link SceneSnapshot}
+ * instances for the renderer thread.
+ */
 public final class Scene {
     private static final Logger logger = LoggerFactory.getLogger(Scene.class);
 

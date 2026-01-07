@@ -16,6 +16,9 @@ import java.util.Optional;
 import java.util.ArrayList;
 import java.util.stream.Stream;
 
+/**
+ * Loads model importer plugins and selects the appropriate importer per file.
+ */
 public final class ModelImportService {
     private static final Logger logger = LoggerFactory.getLogger(ModelImportService.class);
     private static final String[] FALLBACK_IMPORTERS = {

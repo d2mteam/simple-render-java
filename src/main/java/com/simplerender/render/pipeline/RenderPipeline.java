@@ -5,6 +5,9 @@ import com.simplerender.math.Vector3f;
 import com.simplerender.render.RenderItem;
 import com.simplerender.render.culling.FrustumCuller;
 
+/**
+ * CPU-side render pipeline that performs visibility decisions.
+ */
 public final class RenderPipeline {
     private final FrustumCuller frustumCuller;
 

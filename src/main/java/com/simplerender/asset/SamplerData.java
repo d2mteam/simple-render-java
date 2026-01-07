@@ -1,5 +1,11 @@
 package com.simplerender.asset;
 
+/**
+ * Portable sampler description using OpenGL-compatible constants.
+ *
+ * <p>The renderer translates these settings into {@code GL_TEXTURE_*} state
+ * when creating a {@code GpuSampler}.
+ */
 public final class SamplerData {
     public static final int NEAREST = 9728;
     public static final int LINEAR = 9729;

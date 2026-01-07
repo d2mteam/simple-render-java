@@ -9,6 +9,9 @@ import javafx.application.Platform;
 import java.util.EnumSet;
 import java.util.Set;
 
+/**
+ * Collects JavaFX input events into an {@link InputState} snapshot.
+ */
 public final class JavaFxInputAdapter {
     private final Object lock = new Object();
     private final Set<KeyCode> pressedKeys = EnumSet.noneOf(KeyCode.class);

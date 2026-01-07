@@ -5,6 +5,9 @@ import org.lwjgl.opengl.GL15;
 
 import java.nio.IntBuffer;
 
+/**
+ * OpenGL element buffer wrapper for mesh index data.
+ */
 final class IndexBuffer {
     private int bufferId;
     private int capacityIndices;

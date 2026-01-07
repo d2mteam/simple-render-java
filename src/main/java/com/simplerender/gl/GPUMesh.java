@@ -6,6 +6,12 @@ import org.lwjgl.opengl.GL20;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * GPU-resident mesh that owns VAO/VBO/IBO state and issues draw calls.
+ *
+ * <p>Uploads {@link MeshData} into interleaved vertex buffers and keeps track
+ * of the last uploaded snapshot to avoid redundant transfers.
+ */
 public final class GPUMesh {
     private static final Logger logger = LoggerFactory.getLogger(GPUMesh.class);
 

@@ -1,5 +1,8 @@
 package com.simplerender.app;
 
+/**
+ * Immutable configuration for application boot and render settings.
+ */
 public final class EngineConfig {
     private final int targetFps;
     private final int maxFrames;

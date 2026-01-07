@@ -3,6 +3,9 @@ package com.simplerender.memory;
 import java.util.ArrayDeque;
 import java.util.Deque;
 
+/**
+ * Fixed-size block allocator backed by a preallocated byte array.
+ */
 public final class PoolAllocator implements Allocator {
     private final byte[] buffer;
     private final int blockSize;

@@ -16,6 +16,12 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
+/**
+ * Registry for CPU-to-GPU resource uploads and handle lookups.
+ *
+ * <p>Creates stable handles for meshes, materials, textures, and samplers and
+ * stores their GPU counterparts for retrieval during rendering.
+ */
 final class GpuResourceManager {
     private static final Logger logger = LoggerFactory.getLogger(GpuResourceManager.class);
 
@@ -230,16 +236,25 @@ final class GpuResourceManager {
         return slot.map(TextureSlot::texCoord).orElse(0);
     }
 
+    /**
+     * Delegate used for deferred texture uploads in material creation.
+     */
     @FunctionalInterface
     interface TextureUploadDelegate {
         TextureHandle upload(TextureData textureData);
     }
 
+    /**
+     * Delegate used for deferred sampler uploads in material creation.
+     */
     @FunctionalInterface
     interface SamplerUploadDelegate {
         SamplerHandle upload(SamplerData samplerData);
     }
 
+    /**
+     * GPU-ready material binding information.
+     */
     record GpuMaterial(
             float[] baseColor,
             TextureHandle baseColorTexture,

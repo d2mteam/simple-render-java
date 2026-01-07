@@ -8,6 +8,11 @@ import org.lwjgl.opengl.GL15;
 import org.lwjgl.opengl.GL30;
 import org.lwjgl.opengl.GL44;
 
+/**
+ * VBO wrapper that uses persistent mapping when supported by the driver.
+ *
+ * <p>Falls back to dynamic uploads if {@code GL_ARB_buffer_storage} is unavailable.
+ */
 public final class PersistentMappedVbo {
     private final int bufferId;
     private int capacityBytes;

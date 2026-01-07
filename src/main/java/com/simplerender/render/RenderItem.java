@@ -1,5 +1,8 @@
 package com.simplerender.render;
 
+/**
+ * Renderable instance linking a mesh, material, and transform.
+ */
 public final class RenderItem {
     private final MeshHandle meshHandle;
     private final MaterialHandle materialHandle;

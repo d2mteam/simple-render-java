@@ -1,5 +1,8 @@
 package com.simplerender.app;
 
+/**
+ * Tracks per-frame timing information for simulation updates.
+ */
 public final class Time {
     private long lastTimeNanos;
     private float deltaSeconds;

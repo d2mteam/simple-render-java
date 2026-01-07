@@ -1,5 +1,11 @@
 package com.simplerender.gl;
 
+/**
+ * Collection of screen-space effects toggles and tuning parameters.
+ *
+ * <p>These settings feed into shader uniforms and post-processing passes to
+ * enable effects such as tone mapping, bloom, and ray tracing blends.
+ */
 public final class ScreenSpaceSettings {
     private boolean toneMappingEnabled = true;
     private boolean bloomEnabled = true;

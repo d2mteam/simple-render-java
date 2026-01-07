@@ -27,6 +27,11 @@ import java.nio.file.Path;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+/**
+ * JavaFX UI panel for controlling render settings and scene transforms.
+ *
+ * <p>Exposes toggles for post-processing, shader selection, and model loading.
+ */
 public final class RenderControlPanel {
         private static final Logger logger = LoggerFactory.getLogger(RenderControlPanel.class);
         private static final AtomicBoolean started = new AtomicBoolean(false);

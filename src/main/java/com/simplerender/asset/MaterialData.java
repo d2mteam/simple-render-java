@@ -3,6 +3,12 @@ package com.simplerender.asset;
 import java.util.Arrays;
 import java.util.Optional;
 
+/**
+ * Material description containing base color and optional texture slots.
+ *
+ * <p>Material data stays on the CPU side and is converted into GPU resources
+ * through {@code GpuResourceManager} when needed.
+ */
 public final class MaterialData {
     private final float[] baseColor;
     private final TextureSlot baseColorTexture;

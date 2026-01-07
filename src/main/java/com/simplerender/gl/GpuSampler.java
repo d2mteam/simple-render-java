@@ -6,6 +6,9 @@ import org.lwjgl.opengl.GL12;
 import org.lwjgl.opengl.GL14;
 import org.lwjgl.opengl.GL33;
 
+/**
+ * GPU sampler wrapper translating {@link SamplerData} to OpenGL sampler state.
+ */
 final class GpuSampler {
     private final int samplerId;
 
