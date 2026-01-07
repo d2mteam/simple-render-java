@@ -9,6 +9,9 @@ import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * Application bootstrap that initializes rendering, plugins, and the scene.
+ */
 public final class GameApplication {
     private static final Logger logger = LoggerFactory.getLogger(GameApplication.class);
 

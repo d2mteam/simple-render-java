@@ -1,5 +1,8 @@
 package com.simplerender.math;
 
+/**
+ * Mutable 3D vector utility used for camera and bounds calculations.
+ */
 public final class Vector3f {
     private float x;
     private float y;

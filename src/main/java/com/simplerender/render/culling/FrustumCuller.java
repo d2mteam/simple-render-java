@@ -3,6 +3,9 @@ package com.simplerender.render.culling;
 import com.simplerender.math.Matrix4f;
 import com.simplerender.math.Vector3f;
 
+/**
+ * Extracts view frustum planes and tests bounding spheres for visibility.
+ */
 public final class FrustumCuller {
     private final float[] planes = new float[24];
 

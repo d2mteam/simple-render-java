@@ -1,5 +1,8 @@
 package com.simplerender.math;
 
+/**
+ * Static helpers for common 4x4 matrix operations used by the renderer.
+ */
 public final class Matrix4f {
     private Matrix4f() {
     }

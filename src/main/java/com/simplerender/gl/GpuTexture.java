@@ -10,6 +10,12 @@ import org.lwjgl.opengl.GL30;
 
 import java.nio.ByteBuffer;
 
+/**
+ * GPU-side texture resource wrapper.
+ *
+ * <p>Uploads {@link TextureData} into an OpenGL texture object and exposes the
+ * resulting texture id for binding in shaders.
+ */
 public final class GpuTexture {
     private final int textureId;
 

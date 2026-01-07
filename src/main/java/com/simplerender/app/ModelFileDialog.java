@@ -5,6 +5,9 @@ import javax.swing.filechooser.FileNameExtensionFilter;
 import java.nio.file.Path;
 import java.util.Optional;
 
+/**
+ * Swing-based file picker for selecting model files.
+ */
 public final class ModelFileDialog {
     private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(ModelFileDialog.class);
 

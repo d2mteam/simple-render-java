@@ -7,6 +7,12 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 
+/**
+ * Utility for loading embedded shader sources from the classpath.
+ *
+ * <p>This loader normalizes shader naming, provides default fallbacks, and
+ * logs resource resolution to aid debugging.
+ */
 public final class ShaderSourceLoader {
     private static final Logger logger = LoggerFactory.getLogger(ShaderSourceLoader.class);
     private static final String DEFAULT_SHADER = "default";

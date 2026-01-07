@@ -2,6 +2,12 @@ package com.simplerender.asset;
 
 import java.util.Arrays;
 
+/**
+ * CPU-side texture payload containing RGBA pixels and color space metadata.
+ *
+ * <p>{@link TextureData} is immutable and safe to pass between threads; it is
+ * later uploaded to the GPU by {@code GpuResourceManager}.
+ */
 public final class TextureData {
     private final int width;
     private final int height;

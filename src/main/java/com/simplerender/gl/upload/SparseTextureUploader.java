@@ -13,6 +13,9 @@ import org.lwjgl.opengl.GL21;
 import org.lwjgl.opengl.GL30;
 import org.lwjgl.opengl.GL42;
 
+/**
+ * Uploads textures with optional sparse texture support when available.
+ */
 public final class SparseTextureUploader {
     public GpuTexture upload(TextureData textureData) {
         int textureId = GL11.glGenTextures();

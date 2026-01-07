@@ -2,6 +2,9 @@ package com.simplerender.camera;
 
 import com.simplerender.math.Vector3f;
 
+/**
+ * Camera state containing position, orientation vectors, and movement speed.
+ */
 public final class Camera {
     private final Vector3f position;
     private final Vector3f forward;

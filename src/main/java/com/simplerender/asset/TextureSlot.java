@@ -2,6 +2,12 @@ package com.simplerender.asset;
 
 import java.util.Optional;
 
+/**
+ * Binds a texture with optional sampler settings and UV set selection.
+ *
+ * <p>Texture slots are used by {@link MaterialData} to describe which images
+ * should be sampled for a given material channel.
+ */
 public final class TextureSlot {
     private final TextureData textureData;
     private final SamplerData samplerData;

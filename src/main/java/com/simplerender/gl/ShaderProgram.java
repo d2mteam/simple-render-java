@@ -7,6 +7,11 @@ import org.slf4j.LoggerFactory;
 import java.nio.FloatBuffer;
 import org.lwjgl.BufferUtils;
 
+/**
+ * Wrapper for a linked OpenGL vertex/fragment shader program.
+ *
+ * <p>Handles compilation, uniform uploads, and lifecycle disposal.
+ */
 final class ShaderProgram {
     private static final Logger logger = LoggerFactory.getLogger(ShaderProgram.class);
 

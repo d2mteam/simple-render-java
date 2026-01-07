@@ -9,6 +9,12 @@ import java.nio.ByteBuffer;
 import java.util.ArrayDeque;
 import java.util.Deque;
 
+/**
+ * Bridges rendered framebuffer pixels into a JavaFX {@link ImageView}.
+ *
+ * <p>Copies GPU-readback buffers into a reusable pool and schedules UI updates
+ * on the JavaFX application thread.
+ */
 public final class RenderFrameBridge {
     private static final PixelFormat<ByteBuffer> PIXEL_FORMAT = PixelFormat.getByteBgraInstance();
 

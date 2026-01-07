@@ -2,6 +2,11 @@ package com.simplerender.render;
 
 import com.simplerender.math.Vector3f;
 
+/**
+ * Transform component describing position and uniform scale for a render item.
+ *
+ * <p>Combines optional imported transforms with runtime adjustments.
+ */
 public final class Transform {
     private final float[] baseMatrix;
     private float x;

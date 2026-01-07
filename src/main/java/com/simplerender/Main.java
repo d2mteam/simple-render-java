@@ -5,6 +5,12 @@ import com.simplerender.app.GameApplication;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * JVM entry point for the Simple Render desktop application.
+ *
+ * <p>This class wires command-line overrides into an {@link EngineConfig} and
+ * starts the {@link GameApplication} lifecycle.
+ */
 public final class Main {
     private static final Logger logger = LoggerFactory.getLogger(Main.class);
 

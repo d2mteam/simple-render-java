@@ -3,6 +3,12 @@ package com.simplerender.asset;
 import com.simplerender.math.Vector3f;
 import java.util.Arrays;
 
+/**
+ * Immutable mesh payload with vertex attributes and precomputed bounds.
+ *
+ * <p>{@link MeshData} includes positions, normals, tangents, UVs, and indices.
+ * It also computes a bounding sphere used by frustum culling.
+ */
 public final class MeshData {
     private final float[] positions;
     private final float[] normals;

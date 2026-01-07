@@ -1,5 +1,8 @@
 package com.simplerender.memory;
 
+/**
+ * View into a byte buffer representing an allocated region.
+ */
 public final class MemoryBlock {
     private final byte[] buffer;
     private final int offset;

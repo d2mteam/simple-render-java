@@ -1,5 +1,8 @@
 package com.simplerender.render.buffer;
 
+/**
+ * Scratch buffer for temporary render math and data packing.
+ */
 public final class RenderBuffer {
     private final float[] scratch;
 

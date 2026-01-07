@@ -2,6 +2,9 @@ package com.simplerender.gl;
 
 import org.lwjgl.opengl.GL15;
 
+/**
+ * Upload strategies for mesh buffer allocation.
+ */
 public enum MeshUploadMode {
     STATIC_ONE_SHOT(GL15.GL_STATIC_DRAW),
     DYNAMIC_PERSISTENT(GL15.GL_DYNAMIC_DRAW);

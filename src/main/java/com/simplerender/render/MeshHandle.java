@@ -2,6 +2,9 @@ package com.simplerender.render;
 
 import java.util.Objects;
 
+/**
+ * Stable identifier for a GPU mesh resource.
+ */
 public final class MeshHandle {
     private final int id;
 

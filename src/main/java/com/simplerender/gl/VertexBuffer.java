@@ -5,6 +5,11 @@ import org.lwjgl.opengl.GL15;
 
 import java.nio.FloatBuffer;
 
+/**
+ * OpenGL array buffer wrapper for vertex attribute streams.
+ *
+ * <p>Manages a reusable {@link FloatBuffer} and resizes GPU storage as needed.
+ */
 final class VertexBuffer {
     private int bufferId;
     private int capacityFloats;

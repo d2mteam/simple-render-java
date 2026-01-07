@@ -5,6 +5,11 @@ import org.lwjgl.BufferUtils;
 import org.lwjgl.opengl.GL15;
 import org.lwjgl.opengl.GL31;
 
+/**
+ * Double-buffered UBO/VBO uploader for ECS-like render data.
+ *
+ * <p>Alternates between two buffers to avoid CPU/GPU sync stalls when updating.
+ */
 public final class EcsRenderDataDoubleBuffer {
     private final int[] buffers;
     private final int target;

@@ -48,6 +48,13 @@ import org.lwjgl.BufferUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * Core renderer that manages OpenGL resources and executes the render graph.
+ *
+ * <p>Owns the render pipeline, resource manager, shader programs, and upload
+ * queues, and is responsible for running per-frame draw and post-processing
+ * passes.
+ */
 public final class OpenGLRenderer implements MeshUploader {
     private static final Logger logger = LoggerFactory.getLogger(OpenGLRenderer.class);
 
@@ -681,6 +688,9 @@ public final class OpenGLRenderer implements MeshUploader {
         }
     }
 
+    /**
+     * Render pass that draws scene geometry into the main framebuffer.
+     */
     private static final class ScenePass implements RenderPass {
         @Override
         public String name() {
@@ -693,6 +703,9 @@ public final class OpenGLRenderer implements MeshUploader {
         }
     }
 
+    /**
+     * Render pass that applies post-processing to the scene texture.
+     */
     private static final class PostProcessPass implements RenderPass {
         @Override
         public String name() {
@@ -705,6 +718,9 @@ public final class OpenGLRenderer implements MeshUploader {
         }
     }
 
+    /**
+     * Render pass that runs the ray tracing compute demo and composites results.
+     */
     private static final class RayTracingPass implements RenderPass {
         @Override
         public String name() {
@@ -717,6 +733,9 @@ public final class OpenGLRenderer implements MeshUploader {
         }
     }
 
+    /**
+     * Render pass that reads back the final frame for UI presentation.
+     */
     private static final class ReadbackPass implements RenderPass {
         @Override
         public String name() {

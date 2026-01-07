@@ -3,6 +3,9 @@ package com.simplerender.camera;
 import com.simplerender.app.InputState;
 import com.simplerender.app.Time;
 
+/**
+ * First-person style camera controller driven by input deltas and key states.
+ */
 public final class CameraController {
     private float yaw = -90.0f;
     private float pitch = 0.0f;

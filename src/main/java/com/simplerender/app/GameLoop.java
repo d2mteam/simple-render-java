@@ -5,6 +5,9 @@ import com.simplerender.gl.OpenGLRenderer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * Main update/render loop driving simulation timing and drawing.
+ */
 public final class GameLoop {
     private static final Logger logger = LoggerFactory.getLogger(GameLoop.class);
 

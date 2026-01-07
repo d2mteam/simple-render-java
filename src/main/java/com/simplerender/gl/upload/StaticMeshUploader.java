@@ -4,6 +4,9 @@ import com.simplerender.asset.MeshData;
 import com.simplerender.gl.GPUMesh;
 import com.simplerender.gl.MeshUploadMode;
 
+/**
+ * Uploads immutable mesh data using a static buffer strategy.
+ */
 public final class StaticMeshUploader {
     public GPUMesh upload(MeshData meshData) {
         GPUMesh mesh = new GPUMesh();

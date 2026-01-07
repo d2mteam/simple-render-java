@@ -5,6 +5,11 @@ import java.util.Deque;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
+/**
+ * Slab allocator composed of multiple {@link PoolAllocator} instances.
+ *
+ * <p>Chooses the smallest slab that can satisfy the requested allocation.
+ */
 public final class SlabAllocator implements Allocator {
     private final Map<Integer, PoolAllocator> slabs = new LinkedHashMap<>();
 

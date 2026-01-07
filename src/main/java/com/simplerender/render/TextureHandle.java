@@ -2,6 +2,9 @@ package com.simplerender.render;
 
 import java.util.Objects;
 
+/**
+ * Stable identifier for a GPU texture resource.
+ */
 public final class TextureHandle {
     private final int id;
 

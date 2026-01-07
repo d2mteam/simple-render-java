@@ -1,5 +1,8 @@
 package com.simplerender.asset;
 
+/**
+ * Generates procedural textures for testing and fallback materials.
+ */
 public final class TextureDataFactory {
     private TextureDataFactory() {
     }

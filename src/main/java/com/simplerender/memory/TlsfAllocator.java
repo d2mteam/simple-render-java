@@ -3,6 +3,11 @@ package com.simplerender.memory;
 import java.util.ArrayDeque;
 import java.util.Deque;
 
+/**
+ * Two-level segregated fit allocator for variable-size blocks.
+ *
+ * <p>Designed to provide fast allocation using bucketed free lists.
+ */
 public final class TlsfAllocator implements Allocator {
     private static final int MIN_BLOCK = 16;
     private final byte[] buffer;
@@ -74,6 +79,9 @@ public final class TlsfAllocator implements Allocator {
         return bucket;
     }
 
+    /**
+     * Internal free list node describing an available region.
+     */
     private static final class FreeBlock {
         private final int offset;
         private final int size;
