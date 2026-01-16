@@ -358,7 +358,6 @@ public final class OpenGLRenderer implements MeshUploader {
         shaderProgram.setUniformMat4("uProjection", uniforms.projectionMatrix());
         shaderProgram.setUniformMat4("uView", uniforms.viewMatrix());
         shaderProgram.setUniformVec3("uCameraPos", snapshot.camera().position());
-        shaderProgram.setUniformMat4("uModel", Matrix4f.identity());
         applyLightUniforms();
         pipeline.updateFrustum(uniforms.projectionMatrix(), uniforms.viewMatrix());
         RenderItem[] renderItems = snapshot.renderItems();
@@ -373,6 +372,7 @@ public final class OpenGLRenderer implements MeshUploader {
             if (!pipeline.shouldRender(item, mesh.snapshot())) {
                 continue;
             }
+            shaderProgram.setUniformMat4("uModel", item.transform().matrix());
             shaderProgram.setUniformVec3("uBaseColor", material.baseColor());
             shaderProgram.setUniformIntIfPresent("uBaseColorTexCoord", material.baseColorTexCoord());
             shaderProgram.setUniformIntIfPresent("uNormalTexCoord", material.normalTexCoord());
