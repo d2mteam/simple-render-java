@@ -129,7 +129,8 @@ public class GltfMaterialLoader {
             }
         }
 
-        String alphaMode = material.has("alphaMode") ? material.get("alphaMode").getAsString() : "OPAQUE";
+        MaterialData.AlphaMode alphaMode = MaterialData.AlphaMode.parse(
+                material.has("alphaMode") ? material.get("alphaMode").getAsString() : null);
         float alphaCutoff = material.has("alphaCutoff") ? material.get("alphaCutoff").getAsFloat() : 0.5f;
 
         MaterialData materialData = new MaterialData(
@@ -153,7 +154,7 @@ public class GltfMaterialLoader {
                 (TextureSlot) null,
                 (TextureSlot) null,
                 (TextureSlot) null,
-                "OPAQUE",
+                MaterialData.AlphaMode.OPAQUE,
                 0.5f);
     }
 

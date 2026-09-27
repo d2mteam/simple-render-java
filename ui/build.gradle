@@ -1,0 +1,36 @@
+plugins {
+    id 'application'
+}
+
+group = 'com.simplerender'
+version = '1.0-SNAPSHOT'
+
+def javafxVersion = '21.0.2'
+def javafxPlatform = 'linux'
+
+application {
+    mainClass = 'com.simplerender.ui.Main'
+}
+
+dependencies {
+    implementation project(':engine')
+    implementation "org.openjfx:javafx-base:${javafxVersion}:${javafxPlatform}"
+    implementation "org.openjfx:javafx-graphics:${javafxVersion}:${javafxPlatform}"
+    implementation "org.openjfx:javafx-controls:${javafxVersion}:${javafxPlatform}"
+
+    runtimeOnly 'ch.qos.logback:logback-classic:1.5.13'
+    // Plugins are loaded from their build/classes folders (PF4J development mode),
+    // so libraries they need at runtime must be on the application classpath.
+    runtimeOnly 'com.google.code.gson:gson:2.11.0'
+
+    testImplementation platform('org.junit:junit-bom:5.10.0')
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+tasks.named('run', JavaExec) {
+    // Run from the repository root so "plugins/" and relative model paths resolve.
+    workingDir = rootProject.projectDir
+    // PF4J loads plugins from their compiled classes, so build every project under plugins/ first.
+    dependsOn rootProject.subprojects.findAll { it.path.startsWith(':plugins:') }.collect { "${it.path}:classes" }
+}

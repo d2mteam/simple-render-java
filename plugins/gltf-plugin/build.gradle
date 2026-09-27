@@ -16,7 +16,7 @@ dependencies {
     implementation 'org.pf4j:pf4j:3.12.0'
     annotationProcessor 'org.pf4j:pf4j:3.12.0'
     implementation 'com.google.code.gson:gson:2.11.0'
-    implementation project(':')
+    implementation project(':engine')
 }
 
 jar {

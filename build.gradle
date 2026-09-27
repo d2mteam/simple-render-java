@@ -1,65 +1,17 @@
-plugins {
-    id 'java'
-    id 'application'
-}
-
-application {
-    mainClass = 'com.simplerender.Main'
-}
-
-group = 'com'
-version = '1.0-SNAPSHOT'
-
-repositories {
-    mavenCentral()
-}
-
-def lwjglVersion = "3.3.3"
-def lwjglNatives = "natives-linux"
-def javafxVersion = "21.0.2"
-def javafxPlatform = "linux"
-
-dependencies {
-    implementation platform("org.lwjgl:lwjgl-bom:$lwjglVersion")
-    implementation "org.lwjgl:lwjgl"
-    implementation "org.lwjgl:lwjgl-glfw"
-    implementation "org.lwjgl:lwjgl-opengl"
-    implementation "org.lwjgl:lwjgl-assimp"
-    runtimeOnly "org.lwjgl:lwjgl::$lwjglNatives"
-    runtimeOnly "org.lwjgl:lwjgl-glfw::$lwjglNatives"
-    runtimeOnly "org.lwjgl:lwjgl-opengl::$lwjglNatives"
-    runtimeOnly "org.lwjgl:lwjgl-assimp::$lwjglNatives"
-    implementation 'org.slf4j:slf4j-api:2.0.13'
-    runtimeOnly 'ch.qos.logback:logback-classic:1.5.13'
-    implementation 'org.pf4j:pf4j:3.12.0'
-    implementation "org.openjfx:javafx-base:${javafxVersion}:${javafxPlatform}"
-    implementation "org.openjfx:javafx-graphics:${javafxVersion}:${javafxPlatform}"
-    implementation "org.openjfx:javafx-controls:${javafxVersion}:${javafxPlatform}"
-    implementation 'com.google.code.gson:gson:2.11.0'
-    testImplementation platform('org.junit:junit-bom:5.10.0')
-    testImplementation 'org.junit.jupiter:junit-jupiter'
-    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
-}
-
-test {
-    useJUnitPlatform()
-}
-
-tasks.register('buildPlugins') {
-    dependsOn(':plugins:obj-plugin:jar', ':plugins:gltf-plugin:jar')
-}
-
-tasks.register('copyPlugins', Copy) {
-    dependsOn('buildPlugins')
-    from(project(':plugins:obj-plugin').tasks.named('jar').map { it.archiveFile }) {
-        rename { 'obj-plugin.jar' }
+// Settings shared by every Java module. Each module's own build.gradle lists its dependencies.
+subprojects {
+    repositories {
+        mavenCentral()
     }
-    from(project(':plugins:gltf-plugin').tasks.named('jar').map { it.archiveFile }) {
-        rename { 'gltf-plugin.jar' }
-    }
-    into("${buildDir}/plugins")
-}
 
-tasks.withType(JavaExec).configureEach {
-    dependsOn(':plugins:obj-plugin:classes', ':plugins:gltf-plugin:classes')
+    plugins.withType(JavaPlugin).configureEach {
+        java {
+            sourceCompatibility = JavaVersion.VERSION_21
+            targetCompatibility = JavaVersion.VERSION_21
+        }
+
+        tasks.withType(Test).configureEach {
+            useJUnitPlatform()
+        }
+    }
 }
