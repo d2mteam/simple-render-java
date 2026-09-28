@@ -13,7 +13,15 @@ import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 
+/**
+ * Decodes {@code KHR_draco_mesh_compression} data with Google's official Draco decoder
+ * (the draco3d npm package, run on GraalJS). The decoder is started once and reused.
+ */
 final class DracoDecoder {
+    /** Where to find one attribute in the Draco data and how many values it should have. */
+    record AttributeSpec(int attributeId, int components, int count) {
+    }
+
     private static final String RESOURCE_BASE = "/META-INF/resources/webjars/draco3d/1.5.7/";
     private static final String DECODER_JS = RESOURCE_BASE + "draco_decoder_nodejs.js";
     private static final String DECODER_WASM = RESOURCE_BASE + "draco_decoder.wasm";
@@ -34,8 +42,10 @@ final class DracoDecoder {
 
     private DracoDecoder() {
         try {
-            this.context = Context.newBuilder("js")
+            this.context = Context.newBuilder("js", "wasm")
                     .allowAllAccess(true)
+                    .option("js.webassembly", "true")
+                    .option("engine.WarnInterpreterOnly", "false") // speed is fine for one-off decoding
                     .build();
             this.context.eval("js", "var module = { exports: {} }; var exports = module.exports; "
                     + "var process = undefined; var window = undefined; var importScripts = undefined;");
@@ -53,7 +63,7 @@ final class DracoDecoder {
         }
     }
 
-    DecodedDracoMesh decode(byte[] compressed, Map<String, GltfModelImporter.DracoAttributeSpec> attributeSpecs) {
+    DecodedDracoMesh decode(byte[] compressed, Map<String, AttributeSpec> attributeSpecs) {
         Value decoder = decoderModule.getMember("Decoder").newInstance();
         Value buffer = decoderModule.getMember("DecoderBuffer").newInstance();
         context.getBindings("js").putMember("compressedBytes", compressed);
@@ -78,8 +88,8 @@ final class DracoDecoder {
         }
         int vertexCount = geometry.invokeMember("num_points").asInt();
         Map<String, float[]> attributes = new HashMap<>();
-        for (Map.Entry<String, GltfModelImporter.DracoAttributeSpec> entry : attributeSpecs.entrySet()) {
-            GltfModelImporter.DracoAttributeSpec spec = entry.getValue();
+        for (Map.Entry<String, AttributeSpec> entry : attributeSpecs.entrySet()) {
+            AttributeSpec spec = entry.getValue();
             Value attribute = decoder.invokeMember("GetAttributeByUniqueId", geometry, spec.attributeId());
             if (attribute.isNull()) {
                 continue;
