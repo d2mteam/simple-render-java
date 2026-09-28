@@ -19,9 +19,6 @@ dependencies {
     implementation "org.openjfx:javafx-controls:${javafxVersion}:${javafxPlatform}"
 
     runtimeOnly 'ch.qos.logback:logback-classic:1.5.13'
-    // Plugins are loaded from their build/classes folders (PF4J development mode),
-    // so libraries they need at runtime must be on the application classpath.
-    runtimeOnly 'com.google.code.gson:gson:2.11.0'
 
     testImplementation platform('org.junit:junit-bom:5.10.0')
     testImplementation 'org.junit.jupiter:junit-jupiter'

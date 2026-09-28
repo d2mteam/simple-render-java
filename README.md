@@ -24,7 +24,7 @@ Mục tiêu của project: **đơn giản, dễ đọc, kiến trúc rõ ràng**
 | --- | --- |
 | `engine/` | Lõi render. Không phụ thuộc JavaFX, dùng được từ bất kỳ front-end nào (UI, test, tool offline). |
 | `ui/` | App desktop JavaFX. Chỉ dùng API công khai của engine. |
-| `plugins/` | Importer OBJ và glTF, được nạp lúc chạy bằng PF4J. |
+| `plugins/` | Importer OBJ và glTF (có hỗ trợ `.glb`, sparse accessor, Draco), được nạp lúc chạy bằng PF4J. |
 
 Ranh giới giữa hai lõi được Gradle đảm bảo: module `engine` không thể import JavaFX.
 Bên trong engine, `ArchitectureTest` kiểm tra rằng các tầng chỉ phụ thuộc xuống dưới.
@@ -46,8 +46,8 @@ gradle test
 
 Điều khiển: click vào khung hình, dùng **W A S D** để di chuyển, **Space / Shift** để lên / xuống, **kéo chuột** để xoay camera.
 
-> `gradle.properties` đang trỏ `org.gradle.java.home` tới JDK trên một máy cụ thể. Trên máy khác, hãy sửa
-> dòng đó hoặc chạy kèm `-Dorg.gradle.java.home=<đường dẫn JDK 21>`.
+Cần JDK 21. Gradle tự tìm JDK đã cài (JAVA_HOME, `/usr/lib/jvm`, `~/.jdks` của IntelliJ, SDKMAN, ...) qua Java toolchain,
+nên không cần cấu hình đường dẫn.
 
 ## Cấu trúc code
 

@@ -5,13 +5,35 @@ subprojects {
     }
 
     plugins.withType(JavaPlugin).configureEach {
+        // Gradle finds an installed JDK 21 by itself (JAVA_HOME, /usr/lib/jvm, IntelliJ's ~/.jdks, SDKMAN, ...).
         java {
-            sourceCompatibility = JavaVersion.VERSION_21
-            targetCompatibility = JavaVersion.VERSION_21
+            toolchain {
+                languageVersion = JavaLanguageVersion.of(21)
+            }
         }
 
         tasks.withType(Test).configureEach {
             useJUnitPlatform()
         }
+    }
+}
+
+// Plugins run straight from their build/ folders (PF4J development mode). Each one gets its
+// own libraries copied to build/plugin-libs, where the engine's plugin loader finds them.
+// Libraries the application already provides are left out so both sides share them.
+configure(subprojects.findAll { it.path.startsWith(':plugins:') }) {
+    plugins.withType(JavaPlugin).configureEach {
+        def pluginLibs = tasks.register('pluginLibs', Sync) {
+            from {
+                configurations.runtimeClasspath.incoming.artifactView {
+                    componentFilter { id ->
+                        !(id instanceof ProjectComponentIdentifier) &&
+                                !(id instanceof ModuleComponentIdentifier && id.group in ['org.pf4j', 'org.slf4j', 'org.lwjgl'])
+                    }
+                }.files
+            }
+            into layout.buildDirectory.dir('plugin-libs')
+        }
+        tasks.named('classes') { dependsOn pluginLibs }
     }
 }

@@ -93,6 +93,15 @@ Tài nguyên sống tới khi `Renderer.close()` được gọi.
 ## 7. Render pass và trạng thái GL
 
 Hai pass được gọi tuần tự, rõ ràng trong `Renderer.render()`; không có framework "render graph".
+
+**Thứ tự vẽ trong `ScenePass`:** object đục (`OPAQUE`, `MASK`) được vẽ trước theo thứ tự trong scene. Sau đó mới tới object
+trong suốt (`BLEND`), sắp từ xa tới gần camera (theo tâm bounding sphere), không ghi depth, để mỗi lớp blend đè lên
+những gì nằm phía sau nó.
+
+**Alpha trong shader** (`resolveAlpha` trong `default.frag` / `disney_brdf.frag`): `MASK` bỏ (discard) fragment có alpha
+của base color texture nhỏ hơn `uAlphaCutoff`; `BLEND` giữ alpha của texture; `OPAQUE` luôn là 1.
+
+**Màu:** scene shader xuất màu **tuyến tính** (HDR). Tone mapping và gamma chỉ được áp **một lần**, ở `screen_post.frag`.
 Quy tắc: **pass nào đổi trạng thái GL thì phải trả lại khi xong.** `ScenePass` tắt blending, bật lại depth write
 và gỡ các sampler object ở cuối pass. Thiếu bước này, sampler có mipmap của một material glTF sẽ "rò" sang
 `PostProcessPass` và làm cả khung hình bị đen.
@@ -116,10 +125,23 @@ Uniform mà mọi scene shader nhận được:
 - **Thêm pass:** tạo class `XxxPass` trong `render` (có `render(...)` và `close()`), tạo `RenderTarget` cho nó trong
   `Renderer`, rồi gọi nó trong `Renderer.render()` ở đúng thứ tự.
 - **Thêm định dạng model:** tạo plugin mới trong `plugins/`, implement `ModelImporter`, đánh dấu `@Extension`, thêm
-  `plugin.properties` và `include` trong `settings.gradle`.
+  `plugin.properties` và `include` trong `settings.gradle`. Thư viện riêng của plugin được Gradle tự copy vào
+  `build/plugin-libs` (task `pluginLibs`) và PF4J nạp từ đó; không cần khai báo gì ở module `ui`.
 - **Thêm loại đèn / đổi đèn mặc định:** `Light.defaultRig()`.
 
 ## 9. Kiểm thử
 
-- `gradle test`: unit test cho phần CPU (camera, scene, culling, mesh, settings, parse tham số) cùng `ArchitectureTest`.
+- `gradle test`: unit test cho phần CPU (camera, scene, culling, mesh, settings, parse tham số) cùng `ArchitectureTest`,
+  và test cho importer glTF (GLB, node lồng nhau, sparse accessor, material, Draco).
 - Smoke test app thật: `gradle run --args="--model test.obj --max-frames 300"` sẽ tự thoát sau 300 frame.
+
+## 10. Plugin glTF
+
+| Class | Trách nhiệm |
+| --- | --- |
+| `GltfDocument` | Đọc `.gltf` / `.glb`, giải mã accessor (kiểu số nguyên / normalized / sparse) và buffer view |
+| `GltfModelImporter` | Duyệt cây node của scene mặc định, cộng dồn transform, đọc từng primitive thành `MeshData` |
+| `GltfMaterialLoader` | Material PBR, texture, sampler, `alphaMode`, `KHR_materials_unlit` (hiển thị dưới dạng emissive) |
+| `DracoDecoder` | Giải nén `KHR_draco_mesh_compression` bằng decoder chính thức (draco3d WASM chạy trên GraalJS + GraalWasm) |
+
+Chưa hỗ trợ: animation, skinning, morph target, và thành phần alpha của `baseColorFactor` (chỉ alpha từ texture được dùng).

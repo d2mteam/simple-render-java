@@ -6,8 +6,11 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import org.pf4j.BasePluginLoader;
 import org.pf4j.DefaultPluginManager;
+import org.pf4j.DevelopmentPluginClasspath;
 import org.pf4j.PluginDescriptorFinder;
+import org.pf4j.PluginLoader;
 import org.pf4j.PluginManager;
 import org.pf4j.PropertiesPluginDescriptorFinder;
 import org.pf4j.RuntimeMode;
@@ -19,7 +22,8 @@ import org.slf4j.LoggerFactory;
  *
  * <p>Plugins are read with PF4J in <em>development</em> mode: every folder under
  * {@code plugins/} with a {@code plugin.properties} file is a plugin, and its classes are
- * loaded from its Gradle {@code build/classes} output. This is what {@code gradle run} uses.
+ * loaded from its Gradle {@code build/classes} output, plus the libraries the build copied
+ * to {@code build/plugin-libs}. This is what {@code gradle run} uses.
  */
 public final class ModelImportService {
     private static final Logger logger = LoggerFactory.getLogger(ModelImportService.class);
@@ -111,6 +115,11 @@ public final class ModelImportService {
         @Override
         protected PluginDescriptorFinder createPluginDescriptorFinder() {
             return new PropertiesPluginDescriptorFinder();
+        }
+
+        @Override
+        protected PluginLoader createPluginLoader() {
+            return new BasePluginLoader(this, new DevelopmentPluginClasspath().addJarsDirectories("build/plugin-libs"));
         }
     }
 }

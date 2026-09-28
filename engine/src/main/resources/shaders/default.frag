@@ -22,6 +22,8 @@ uniform int uNormalTexCoord;
 uniform int uMetallicRoughnessTexCoord;
 uniform int uAoTexCoord;
 uniform int uEmissiveTexCoord;
+uniform int uAlphaMode; // 0=OPAQUE, 1=MASK, 2=BLEND
+uniform float uAlphaCutoff;
 uniform vec3 uCameraPos;
 out vec4 FragColor;
 
@@ -29,7 +31,22 @@ vec2 selectTexCoord(int index) {
     return index == 1 ? vTexCoord1 : vTexCoord0;
 }
 
+// Opacity of this fragment. MASK discards fragments below the cutoff, BLEND keeps the
+// texture alpha, OPAQUE is always fully opaque.
+float resolveAlpha(float alpha) {
+    if (uAlphaMode == 1) {
+        if (alpha < uAlphaCutoff) {
+            discard;
+        }
+        return 1.0;
+    }
+    return uAlphaMode == 2 ? alpha : 1.0;
+}
+
 void main() {
+    vec4 baseSample = texture(uBaseColorTex, selectTexCoord(uBaseColorTexCoord));
+    float alpha = resolveAlpha(baseSample.a);
+
     vec2 normalUv = selectTexCoord(uNormalTexCoord);
     vec3 n = normalize(vNormal);
     vec3 t = normalize(vTangent);
@@ -38,12 +55,11 @@ void main() {
     vec3 normalSample = texture(uNormalTex, normalUv).rgb * 2.0 - 1.0;
     n = normalize(tbn * normalSample);
 
-    vec2 baseUv = selectTexCoord(uBaseColorTexCoord);
     vec2 metallicUv = selectTexCoord(uMetallicRoughnessTexCoord);
     vec2 aoUv = selectTexCoord(uAoTexCoord);
     vec2 emissiveUv = selectTexCoord(uEmissiveTexCoord);
 
-    vec3 base = uBaseColor * texture(uBaseColorTex, baseUv).rgb;
+    vec3 base = uBaseColor * baseSample.rgb;
     vec3 metallicRoughness = texture(uMetallicRoughnessTex, metallicUv).rgb;
     float metallic = metallicRoughness.b;
     float roughness = metallicRoughness.g;
@@ -104,5 +120,5 @@ void main() {
     vec3 reflection = ambientReflection * metallic; // Only add environment reflection for metallic parts
     
     vec3 color = lit + reflection + totalSpecular + emissive;
-    FragColor = vec4(color, 1.0);
+    FragColor = vec4(color, alpha);
 }

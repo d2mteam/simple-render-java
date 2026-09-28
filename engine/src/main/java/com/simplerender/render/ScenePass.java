@@ -2,6 +2,7 @@ package com.simplerender.render;
 
 import com.simplerender.asset.MaterialData;
 import com.simplerender.math.Matrix4f;
+import com.simplerender.math.Vector3f;
 import com.simplerender.render.GpuResourceCache.GpuMaterial;
 import com.simplerender.render.GpuResourceCache.TextureBinding;
 import com.simplerender.render.gl.GpuSampler;
@@ -11,6 +12,8 @@ import com.simplerender.scene.CameraSnapshot;
 import com.simplerender.scene.Light;
 import com.simplerender.scene.SceneSnapshot;
 import com.simplerender.scene.SceneSnapshot.RenderItem;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import org.lwjgl.opengl.GL11;
 import org.slf4j.Logger;
@@ -87,14 +90,20 @@ final class ScenePass implements AutoCloseable {
         shader.setVec3("uCameraPos", new float[] { camera.position().x(), camera.position().y(), camera.position().z() });
         setLights(scene.lights());
 
+        // Opaque (and alpha-masked) objects first, in scene order. Then transparent objects from
+        // far to near, so each one blends over whatever is already behind it.
+        List<RenderItem> opaque = new ArrayList<>();
+        List<RenderItem> transparent = new ArrayList<>();
         for (RenderItem item : scene.items()) {
-            if (!culler.isVisible(item.mesh(), item.modelMatrix())) {
-                continue;
+            if (culler.isVisible(item.mesh(), item.modelMatrix())) {
+                boolean blended = item.material().alphaMode() == MaterialData.AlphaMode.BLEND;
+                (blended ? transparent : opaque).add(item);
             }
-            shader.setMat4("uModel", item.modelMatrix());
-            setMaterial(resources.material(item.material()));
-            resources.mesh(item.mesh()).draw();
         }
+        Vector3f eye = camera.position();
+        transparent.sort(Comparator.comparingDouble((RenderItem item) -> distanceSquared(eye, item)).reversed());
+        opaque.forEach(this::draw);
+        transparent.forEach(this::draw);
 
         // Leave clean state for the next pass: no blending, depth writes on, no sampler overrides.
         GL11.glDisable(GL11.GL_BLEND);
@@ -102,6 +111,22 @@ final class ScenePass implements AutoCloseable {
         for (MaterialTexture slot : MaterialTexture.values()) {
             GpuSampler.unbind(slot.unit());
         }
+    }
+
+    private void draw(RenderItem item) {
+        shader.setMat4("uModel", item.modelMatrix());
+        setMaterial(resources.material(item.material()));
+        resources.mesh(item.mesh()).draw();
+    }
+
+    /** Squared distance from the eye to the centre of the item's bounding sphere, in world space. */
+    private static double distanceSquared(Vector3f eye, RenderItem item) {
+        Vector3f c = item.mesh().boundsCenter();
+        float[] m = item.modelMatrix();
+        double dx = m[0] * c.x() + m[4] * c.y() + m[8] * c.z() + m[12] - eye.x();
+        double dy = m[1] * c.x() + m[5] * c.y() + m[9] * c.z() + m[13] - eye.y();
+        double dz = m[2] * c.x() + m[6] * c.y() + m[10] * c.z() + m[14] - eye.z();
+        return dx * dx + dy * dy + dz * dz;
     }
 
     private void setLights(List<Light> lights) {

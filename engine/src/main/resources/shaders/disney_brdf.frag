@@ -31,6 +31,18 @@ vec2 selectTexCoord(int index) {
     return index == 1 ? vTexCoord1 : vTexCoord0;
 }
 
+// Opacity of this fragment. MASK discards fragments below the cutoff, BLEND keeps the
+// texture alpha, OPAQUE is always fully opaque.
+float resolveAlpha(float alpha) {
+    if (uAlphaMode == 1) {
+        if (alpha < uAlphaCutoff) {
+            discard;
+        }
+        return 1.0;
+    }
+    return uAlphaMode == 2 ? alpha : 1.0;
+}
+
 float schlickWeight(float cosTheta) {
     float m = clamp(1.0 - cosTheta, 0.0, 1.0);
     return m * m * m * m * m;
@@ -91,16 +103,13 @@ void main() {
     float roughness = metallicRoughness.g;
     float ao = texture(uAoTex, aoUv).r;
     vec3 emissive = texture(uEmissiveTex, emissiveUv).rgb;
-    vec3 baseSample = texture(uBaseColorTex, baseUv).rgb;
-    float alphaSample = texture(uBaseColorTex, baseUv).a;
-    vec3 base = uBaseColor * baseSample;
+    vec4 baseSample = texture(uBaseColorTex, baseUv);
+    float alpha = resolveAlpha(baseSample.a);
+    vec3 base = uBaseColor * baseSample.rgb;
     
     vec3 v = normalize(uCameraPos - vWorldPos);
     vec3 color = applyLighting(n, v, base, metallic, roughness, ao, emissive);
     
-    // Gamma correction
-    color = color / (color + vec3(1.0));
-    color = pow(color, vec3(1.0 / 2.2));
-    
-    FragColor = vec4(color, alphaSample);
+    // Output stays linear: tone mapping and gamma are applied once, in screen_post.frag.
+    FragColor = vec4(color, alpha);
 }
