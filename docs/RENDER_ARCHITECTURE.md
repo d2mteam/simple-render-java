@@ -142,6 +142,6 @@ Uniform mà mọi scene shader nhận được:
 | `GltfDocument` | Đọc `.gltf` / `.glb`, giải mã accessor (kiểu số nguyên / normalized / sparse) và buffer view |
 | `GltfModelImporter` | Duyệt cây node của scene mặc định, cộng dồn transform, đọc từng primitive thành `MeshData` |
 | `GltfMaterialLoader` | Material PBR, texture, sampler, `alphaMode`, `KHR_materials_unlit` (hiển thị dưới dạng emissive) |
-| `DracoDecoder` | Giải nén `KHR_draco_mesh_compression` bằng decoder chính thức (draco3d WASM chạy trên GraalJS + GraalWasm) |
+| `DracoDecoder` | Giải nén `KHR_draco_mesh_compression` bằng [Openize.Drako](https://github.com/openize-drako/Openize.Drako-for-Java): bản port Java thuần của Draco (MIT, ~375 KB, không có native code) |
 
 Chưa hỗ trợ: animation, skinning, morph target, và thành phần alpha của `baseColorFactor` (chỉ alpha từ texture được dùng).

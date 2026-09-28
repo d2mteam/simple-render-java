@@ -215,7 +215,7 @@ public final class GltfModelImporter implements ModelImporter {
                     accessor.get("count").getAsInt()));
         }
         byte[] compressed = document.bufferViewBytes(draco.get("bufferView").getAsInt());
-        return DracoDecoder.getInstance().decode(compressed, specs);
+        return DracoDecoder.decode(compressed, specs);
     }
 
     /** glTF tangents are vec4: xyz plus w = +-1 telling which way the bitangent points. */
